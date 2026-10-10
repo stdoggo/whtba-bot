@@ -12,7 +12,7 @@ datasource db {
 }
 
 model Message {
-  id        BigInt      @id @unique @default(autoincrement())
+  id        BigInt      @id @unique
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   worldUserId BigInt
@@ -83,7 +83,7 @@ model ChannelSettings {
 }
 
 model World {
-  id        BigInt      @id @unique @default(autoincrement())
+  id        BigInt      @id @unique
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   users     WorldUser[]

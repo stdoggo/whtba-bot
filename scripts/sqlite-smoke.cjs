@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 (async () => {
   const guildId = BigInt('123456789012345678');
   const channelId = BigInt('123456789012345679');
-  const world = await prisma.world.create({ data: {} });
+  const world = await prisma.world.create({ data: { id: 1n } });
   await prisma.server.create({ data: { id: guildId, worldId: world.id } });
   const settings = { likeReaction: '👍', dislikeReaction: '👎', reactToBots: true,
     reactionChannelIds: [guildId.toString()], mediaHelper: { enabled: true } };
