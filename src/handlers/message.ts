@@ -3,6 +3,7 @@ import { createUser } from '../queries/create-user';
 import { getChannelSettings } from '../queries/get-channel-settings';
 import { getServerSettings } from '../queries/get-server-settings';
 import { isReactionChannelAllowed } from '../settings/reaction-channels';
+import { isReactionAuthorAllowed } from '../settings/bot-reactions';
 import { getUserLocal } from '../queries/get-user-local';
 import { isValidEnvironment, processInitialReactions } from '../utils';
 import { RegisterMessageParams, registerMessage } from '../queries/register-message';
@@ -10,10 +11,15 @@ import { RegisterMessageParams, registerMessage } from '../queries/register-mess
 const urlRegex = /(?:(?:https?|ftp|file):\/\/|www\.|ftp\.)(?:\([-A-Z0-9+&@#/%=~_|$?!:,.]*\)|[-A-Z0-9+&@#/%=~_|$?!:,.])*(?:\([-A-Z0-9+&@#/%=~_|$?!:,.]*\)|[A-Z0-9+&@#/%=~_|$])/igm;
 export const processMessage = async (client: any, m: Message | PartialMessage, prisma: any) => {
 	let message = m;
-	if(message?.author?.bot) return;
 	if(!message?.guild?.id) message = await message.fetch();
 
 	if (!message.guild || !message.author) return;
+	// Never process our own messages. Other bots are allowed only when opted in.
+	if (message.author.id === client.user?.id) return;
+	if (message.author.bot) {
+		const serverSettings = await getServerSettings(message.guild.id, prisma);
+		if (!isReactionAuthorAllowed(message.author, client.user?.id, serverSettings?.settings)) return;
+	}
 
 	const v = await isValidEnvironment(message?.guild?.id);
 	if (v?.pointOfFailure) {

@@ -75,7 +75,13 @@ discordClient.once('ready', async () => {
 // List of Discord Events -> https://old.discordjs.dev/#/docs/discord.js/14.11.0/typedef/Events
 // Messages
 discordClient.on(Events.MessageCreate, (message: any) => {
-	if (message.guildId !== allowedGuildId || message.author?.bot) return;
+	if (message.guildId !== allowedGuildId) return;
+	if (discordClient.user?.id && message.author?.id === discordClient.user.id) return;
+	// Do not invoke link-fixing on another bot's messages; only media reactions.
+	if (message.author?.bot) {
+		void processMessage(discordClient, message, prismaClient).catch(error => console.error('Bot media handler:', error));
+		return;
+	}
 	const links = findMediaLinks(message.content ?? '');
 	if (links.length) {
 		void handleAutomaticMedia(message, prismaClient, links)

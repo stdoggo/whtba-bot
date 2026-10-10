@@ -1,13 +1,15 @@
 import { Client, MessageReaction, PartialMessageReaction, PartialUser, User } from 'discord.js';
 import { getServerSettings } from '../queries/get-server-settings';
 import { isReactionChannelAllowed } from '../settings/reaction-channels';
+import { isReactionAuthorAllowed } from '../settings/bot-reactions';
 import { numberExtractRegex } from '../utils';
 import { registerMessage, dislikeAdd, likeAdd, likeRemove, dislikeRemove, RegisterMessageParams } from '../queries/register-message';
 import { getMessageParams } from './message';
 
 
 export const processReaction = async (client: Client, reaction: MessageReaction | PartialMessageReaction, added: boolean, user: User | PartialUser, prisma: any) => {
-	if(reaction?.message?.author?.bot || user?.bot) return;
+	// Bot votes remain excluded; people can vote on other bots' posts when enabled.
+	if(user?.bot) return;
 	let m = reaction?.message;
 	if (!m) return;
 	if (m.partial) m = await m.fetch();
@@ -19,7 +21,8 @@ export const processReaction = async (client: Client, reaction: MessageReaction 
 	const serverId = m.guild?.id;
 	if (!serverId) return;
 	const serverSettings = await getServerSettings(serverId, prisma);
-	if (!serverSettings || !isReactionChannelAllowed(serverSettings.settings, m.channel.id)) return;
+	if (!serverSettings || !isReactionChannelAllowed(serverSettings.settings, m.channel.id) ||
+		!isReactionAuthorAllowed(m.author, client.user?.id, serverSettings.settings)) return;
 
 	const likeReaction : string = serverSettings?.settings?.likeReaction;
 	const dislikeReaction : string = serverSettings?.settings?.dislikeReaction;

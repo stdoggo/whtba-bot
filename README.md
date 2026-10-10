@@ -16,12 +16,12 @@ Private Discord bot configured for one server using `DISCORD_GUILD_ID`. Adds cus
 | YouTube Shorts | Standard YouTube `watch?v=` playable link |
 | Vimeo, Streamable, Dailymotion, `fb.watch` | Original/native URL (if the platform supplies a Discord preview) |
 
-On new messages, the bot replies without pinging the sender, includes the original link as a compact **View original** Markdown link, and tries to hide the original preview. Up to three URLs per message are supported. Link fixing defaults to **all channels** independently of emoji reaction channel selections.
+On new human-authored messages, the bot replies without pinging the sender, includes the original link as a compact **View original** Markdown link, and tries to hide the original preview. Up to three URLs per message are supported. Link fixing defaults to **all channels** independently of emoji reaction channel selections.
 
 ## Commands
 
 All slash commands require Manage Server permission:
-- `/setupserver`: register server and configure like/dislike emojis and supported embed reactions.
+- `/setupserver`: register server and configure like/dislike emojis, supported embed reactions, and bot-post reactions with `react-to-bots:true/false` (default `false`).
 - `/select-channels`: manage channels where 👍/👎 reactions are added. This does not affect the external-link preview handler.
 - `/setupchannel`: adjust channel moderation and embed-reaction preferences.
 - `/settings`: configure link preview enable/disable and its optional channel allowlist; `action:enabled enabled:false` disables fixes, `action:channel-add channel:#channel` starts/extends the allowlist, `action:channel-remove channel:#channel` removes a selection, and `action:channel-all` restores all channels.
@@ -51,6 +51,7 @@ npm start
 - Media is neither downloaded nor re-encoded. The bot only posts URLs; Discord and external embed providers handle preview generation.
 - Proxy uptime and playback support vary, and some videos may only appear as simple links.
 - Link fixing uses its own optional channel allowlist, while reaction controls use `/select-channels`.
+- `/setupserver react-to-bots:true` allows automatic like/dislike reactions on qualifying attachments/embeds posted by **other bots**. Default is disabled for backward compatibility; WHTBA never reacts to its own messages. Existing media/embed rules and selected reaction channels still apply. Human reactions on eligible bot-authored messages update their tracked counts; bot votes remain ignored.
 - PostgreSQL stores server/channel settings and reaction counters. Old converter setting fields in the server JSON are ignored and cleaned when `/settings` saves updated preferences.
 - Events are processed only while the bot is running; past missed messages are not retroactively scanned.
 - Bot/user/message IDs stored by the original reaction tracking system remain unchanged.

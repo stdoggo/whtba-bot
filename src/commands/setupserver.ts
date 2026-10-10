@@ -41,6 +41,11 @@ export const setupserver: Command = {
 					value: 3,
 				},
 			],
+		},
+		{
+			type: ApplicationCommandOptionType.Boolean,
+			name: 'react-to-bots',
+			description: 'Add like/dislike reactions to media posted by other bots (default: off).',
 		}, /*
 		{
 			type: ApplicationCommandOptionType.String,
@@ -76,11 +81,13 @@ export const setupserver: Command = {
 		const hallOfFameReactionOption = await interaction.options.get('hall-of-fame-reaction')?.value;
 		const hallOfFameCuratorOption = await interaction.options.get('hall-of-fame-curator')?.value;
 		const allowEmbedReactions = await interaction.options.get('allow-embed-reactions')?.value;
+		const reactToBotsOption = interaction.options.get('react-to-bots')?.value;
 		if (likeReactionOption !== undefined) updatedSettings.likeReaction = likeReactionOption === undefined ? updatedSettings.likeReaction : likeReactionOption;
 		if (dislikeReactionOption !== undefined) updatedSettings.dislikeReaction = dislikeReactionOption === undefined ? updatedSettings.dislikeReaction : dislikeReactionOption;
 		if (hallOfFameReactionOption !== undefined) updatedSettings.hallOfFameReaction = hallOfFameReactionOption === undefined ? updatedSettings.hallOfFameReaction : hallOfFameReactionOption;
 		if (hallOfFameCuratorOption !== undefined) updatedSettings.hallOfFameCurator = hallOfFameCuratorOption === undefined ? updatedSettings.hallOfFameCurator : hallOfFameCuratorOption;
 		if (allowEmbedReactions !== undefined) updatedSettings.allowEmbedReactions = allowEmbedReactions === undefined ? updatedSettings.allowEmbedReactions : allowEmbedReactions;
+		if (typeof reactToBotsOption === 'boolean') updatedSettings.reactToBots = reactToBotsOption;
 
 
 		await registerServerSettings(updatedSettings, { serverId, lastKnownName:client.guilds.cache.get(interaction.guildId ?? '')?.name ?? '?' }, prismaClient);
