@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
     reactionChannelIds: [guildId.toString()], mediaHelper: { enabled: true } };
   await prisma.serverSettings.create({ data: { id: guildId, settings } });
   await prisma.channelSettings.create({ data: { id: channelId, serverId: guildId, settings: { isTextForbidden: false } } });
-  await prisma.message.create({ data: { worldUserId: guildId, serverId: guildId,
+  await prisma.message.create({ data: { id: BigInt('123456789012345680'), worldUserId: guildId, serverId: guildId,
     channelId, content: { platform: 'tiktok', source: 'https://example.org' } } });
   const saved = await prisma.serverSettings.findUniqueOrThrow({ where: { id: guildId } });
   assert.deepEqual(saved.settings, settings);
