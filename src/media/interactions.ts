@@ -23,9 +23,11 @@ const modalField = (id: string, label: string, required: boolean, placeholder: s
 	);
 
 const showConvertModal = (interaction: ButtonInteraction | MessageContextMenuCommandInteraction, messageId: string, format = '') => {
+	const formatRow = modalField('format','Format veya işlem',true,'mp3, wav, gif, mp4, webm, mute, reverse, speed, trim, caption');
+	if (format) formatRow.components[0].setValue(format);
 	const modal = new ModalBuilder().setTitle('WHTBA medya dönüştürme').setCustomId(PREFIX + 'convert:' + messageId)
 		.addComponents(
-			modalField('format','Format veya işlem',true,'mp3, wav, gif, mp4, webm, mute, reverse, speed, trim, caption'),
+			formatRow,
 			modalField('start','Başlangıç (saniye) — isteğe bağlı',false,'0'),
 			modalField('duration','Süre (saniye) — isteğe bağlı',false,'10'),
 			modalField('speed','Hız (0.5–2) — isteğe bağlı',false,'1.25'),
@@ -135,7 +137,6 @@ export const processMediaComponent = async (interaction: ButtonInteraction | Mod
 	const id = parts[1];
 	try {
 		if (!/^\d{17,20}$/.test(id || '')) throw new Error('Geçersiz mesaj.');
-		const source = await getOriginalMessage(interaction, id);
 		if (interaction.isButton()) {
 			const settings = await enabled(interaction.guildId, interaction.channelId ?? '');
 			if (!settings.quickActions) throw new Error('Hızlı işlem butonları kapalı.');
@@ -144,8 +145,10 @@ export const processMediaComponent = async (interaction: ButtonInteraction | Mod
 				return;
 			}
 			if (!['mp3','gif','mute'].includes(action)) throw new Error('Bilinmeyen işlem.');
+			const source = await getOriginalMessage(interaction, id);
 			await executeConversion(interaction, source, normalizeOptions(action));
 		} else if (interaction.isModalSubmit()) {
+			const source = await getOriginalMessage(interaction, id);
 			if (action === 'convert') {
 				const value = (key: string) => interaction.fields.getTextInputValue(key) || '';
 				const opts = normalizeOptions(value('format'), value('start'), value('duration'),

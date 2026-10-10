@@ -66,4 +66,4 @@ export const findMediaLinks = (content: string): MediaLink[] => {
 };
 
 export const originalLinkLine = (url: string): string => '-# [View original](<' + url + '>)';
-export const proxyEmbedLine = (link: MediaLink): string => originalLinkLine(link.original) + '\n' + link.fixed;
+export const proxyEmbedLine = (link: MediaLink): string => originalLinkLine(link.original) + '\n-# ' + link.fixed;
