@@ -2,29 +2,23 @@ import { ServerSettings } from '../settings/configure';
 
 export interface MediaHelperSettings {
 	enabled: boolean;
-	quickActions: boolean;
-	ephemeralReplies: boolean;
-	autoUpload: boolean;
-	soundboard: boolean;
 	allowedChannelIds?: string[];
 }
 
-export const defaultMediaHelperSettings: MediaHelperSettings = {
-	enabled: true,
-	quickActions: true,
-	ephemeralReplies: false,
-	autoUpload: true,
-	soundboard: true,
-};
+export const defaultMediaHelperSettings: MediaHelperSettings = { enabled: true };
 
-export const mediaHelperSettings = (settings?: ServerSettings | null): MediaHelperSettings => {
-	const customized = settings?.mediaHelper;
-	const merged = { ...defaultMediaHelperSettings, ...(customized || {}) };
-	if (merged.allowedChannelIds !== undefined) {
-		merged.allowedChannelIds = Array.isArray(merged.allowedChannelIds) ?
-			merged.allowedChannelIds.filter(id => typeof id === 'string' && /^\d{17,20}$/.test(id)) : [];
+export const mediaHelperSettings = (server?: ServerSettings | null): MediaHelperSettings => {
+	// Ignore deprecated options stored by older media-conversion versions.
+	const saved = server?.mediaHelper;
+	const result: MediaHelperSettings = {
+		enabled: typeof saved?.enabled === 'boolean' ? saved.enabled : true,
+	};
+	if (saved?.allowedChannelIds !== undefined) {
+		result.allowedChannelIds = Array.isArray(saved.allowedChannelIds)
+			? saved.allowedChannelIds.filter(id => typeof id === 'string' && /^\d{17,20}$/.test(id))
+			: [];
 	}
-	return merged;
+	return result;
 };
 
 export const mediaEnabledInChannel = (settings: MediaHelperSettings, channelId: string): boolean =>

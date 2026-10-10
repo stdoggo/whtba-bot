@@ -15,38 +15,46 @@ export const mediaLinkFromUrl = (raw: string): MediaLink | null => {
 	const host = url.hostname.toLowerCase();
 	const path = url.pathname.toLowerCase();
 	let platform: SupportedSite;
-	let replacement: string | undefined;
-	if (['x.com', 'www.x.com', 'mobile.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'].includes(host)) {
-		platform = 'x'; replacement = 'fxtwitter.com';
-	} else if (['reddit.com', 'www.reddit.com', 'old.reddit.com', 'new.reddit.com', 'm.reddit.com', 'redd.it', 'www.redd.it'].includes(host)) {
-		platform = 'reddit'; replacement = 'vxreddit.com';
-	} else if (['tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vt.tiktok.com', 'vm.tiktok.com'].includes(host)) {
-		platform = 'tiktok'; replacement = 'd.tnktok.com';
-	} else if (['instagram.com', 'www.instagram.com', 'm.instagram.com'].includes(host) && /^\/(reel|reels|p|tv)\//.test(path)) {
-		platform = 'instagram'; replacement = 'deinstagram.com';
+	let destination: string | undefined;
+	if (['x.com','www.x.com','mobile.x.com','twitter.com','www.twitter.com','mobile.twitter.com'].includes(host)) {
+		platform = 'x'; destination = 'fxtwitter.com';
+	} else if (['reddit.com','www.reddit.com','old.reddit.com','new.reddit.com','m.reddit.com'].includes(host)) {
+		platform = 'reddit'; destination = 'vxreddit.com';
+	} else if (['tiktok.com','www.tiktok.com','m.tiktok.com','vm.tiktok.com','vt.tiktok.com'].includes(host)) {
+		platform = 'tiktok';
+		destination = host.startsWith('vm.') ? 'vm.tnktok.com' :
+			host.startsWith('vt.') ? 'vt.tnktok.com' : 'tnktok.com';
+	} else if (['instagram.com','www.instagram.com','m.instagram.com'].includes(host) && /^\/(reel|reels|p|tv)\//.test(path)) {
+		platform = 'instagram'; destination = 'eeinstagram.com';
 	} else if (host === 'bsky.app' && /^\/profile\/[^/]+\/post\//.test(path)) {
-		platform = 'bluesky'; replacement = 'bskye.app';
-	} else if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(host) && /^\/shorts\/[^/]+/.test(path)) {
+		platform = 'bluesky'; destination = 'bskye.app';
+	} else if (['youtube.com','www.youtube.com','m.youtube.com'].includes(host) && /^\/shorts\//.test(path)) {
 		platform = 'youtube';
 		const id = url.pathname.split('/')[2];
-		if (!/^[\w-]{11}$/.test(id || '')) return null;
+		if (!/^[\w-]{11}$/.test(id ?? '')) return null;
+		url.hostname = 'www.youtube.com';
 		url.pathname = '/watch';
 		url.search = '?v=' + id;
 		url.hash = '';
-	} else if (host === 'clips.twitch.tv' || ((host === 'www.twitch.tv' || host === 'twitch.tv') && /\/clip\//.test(path))) {
-		platform = 'twitch';
-	} else if (['facebook.com','www.facebook.com','m.facebook.com','fb.watch'].includes(host) &&
-		(/\/(reel|videos|watch)\//.test(path) || host === 'fb.watch' || url.searchParams.has('v'))) {
-		platform = 'facebook';
-	} else if (host === 'vimeo.com' || host === 'www.vimeo.com' || host === 'player.vimeo.com') {
+	} else if (host === 'clips.twitch.tv' && /^\/[\w-]+\/?$/.test(path)) {
+		platform = 'twitch'; destination = 'fxtwitch.seria.moe';
+		url.pathname = '/clip' + url.pathname;
+	} else if (['twitch.tv','www.twitch.tv','m.twitch.tv'].includes(host) && /\/clip\/[\w-]+\/?$/.test(path)) {
+		platform = 'twitch'; destination = 'fxtwitch.seria.moe';
+	} else if (['facebook.com','www.facebook.com','m.facebook.com','web.facebook.com'].includes(host) &&
+		(/\/(reel|videos|watch|share\/r|share\/v)\//.test(path) || url.searchParams.has('v'))) {
+		platform = 'facebook'; destination = 'facebed.seria.moe';
+	} else if (host === 'fb.watch') {
+		platform = 'facebook'; // Short link: native preview, requires remote redirect to expand.
+	} else if (['vimeo.com','www.vimeo.com','player.vimeo.com'].includes(host)) {
 		platform = 'vimeo';
-	} else if (host === 'streamable.com' || host === 'www.streamable.com') {
+	} else if (['streamable.com','www.streamable.com'].includes(host)) {
 		platform = 'streamable';
-	} else if (host === 'dailymotion.com' || host === 'www.dailymotion.com' || host === 'dai.ly') {
+	} else if (['dailymotion.com','www.dailymotion.com','dai.ly'].includes(host)) {
 		platform = 'dailymotion';
 	} else return null;
 	url.protocol = 'https:';
-	if (replacement) url.hostname = replacement;
+	if (destination) url.hostname = destination;
 	url.port = '';
 	return { platform, original: raw, fixed: url.toString() };
 };
@@ -57,13 +65,10 @@ export const findMediaLinks = (content: string): MediaLink[] => {
 	for (const match of (content || '').matchAll(URL_PATTERN)) {
 		const candidate = match[0].replace(/[.,!?:;\]\)}'"]+$/g, '');
 		const link = mediaLinkFromUrl(candidate);
-		if (link && !seen.has(candidate)) {
-			links.push(link); seen.add(candidate);
-		}
+		if (link && !seen.has(candidate)) { links.push(link); seen.add(candidate); }
 		if (links.length >= 3) break;
 	}
 	return links;
 };
-
 export const originalLinkLine = (url: string): string => '-# [View original](<' + url + '>)';
 export const proxyEmbedLine = (link: MediaLink): string => originalLinkLine(link.original) + '\n-# ' + link.fixed;

@@ -4,7 +4,6 @@ import { Client, Events, GatewayIntentBits, MessageReaction, PartialMessageReact
 import { processMessage } from './handlers/message';
 import { findMediaLinks } from './media/sites';
 import { handleAutomaticMedia } from './media/automatic';
-import { isMediaComponent, isMediaContextCommand, processMediaComponent, processMediaContext } from './media/interactions';
 import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
@@ -88,24 +87,14 @@ discordClient.on(Events.MessageCreate, (message: any) => {
 	void processMessage(discordClient, message, prismaClient).catch(error => console.error('Message handler:', error));
 });
 
-// Slash commands
+// Slash commands and reaction-channel selector.
 discordClient.on(Events.InteractionCreate, async interaction => {
 	if (interaction.guildId !== allowedGuildId) return;
-	if (interaction.isCommand()) {
-		if ('isMessageContextMenuCommand' in interaction && interaction.isMessageContextMenuCommand() &&
-			isMediaContextCommand(interaction.commandName)) {
-			await processMediaContext(interaction);
-		} else {
-			await processCommand(discordClient, interaction);
-		}
-	}
-	else if ((interaction.isChannelSelectMenu() || interaction.isButton()) &&
+	if (interaction.isChatInputCommand()) {
+		await processCommand(discordClient, interaction);
+	} else if ((interaction.isChannelSelectMenu() || interaction.isButton()) &&
 		isSelectChannelsComponent(interaction.customId)) {
 		await processSelectChannelsComponent(interaction);
-	}
-	else if ((interaction.isButton() || interaction.isModalSubmit()) &&
-		isMediaComponent(interaction.customId)) {
-		await processMediaComponent(interaction, discordClient);
 	}
 });
 
