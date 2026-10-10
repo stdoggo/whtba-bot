@@ -18,7 +18,7 @@ model Message {
   worldUserId BigInt
   serverId BigInt
   channelId BigInt
-  content Json @default("{}")
+  content Json
   likeCount Int @default(1)
   dislikeCount Int @default(1)
   interactions Int @default(2)
@@ -68,7 +68,7 @@ model ServerSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   server    Server  @relation(fields: [id], references: [id])
-  settings Json? @default("{}")
+  settings Json?
   lastKnownName String?     @default("?")
 }
 
@@ -79,7 +79,7 @@ model ChannelSettings {
   lastKnownName String?      @default("?")
   serverId  BigInt
   server    Server  @relation(fields: [serverId], references: [id])
-  settings Json? @default("{}")
+  settings Json?
 }
 
 model World {

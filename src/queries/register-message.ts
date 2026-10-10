@@ -10,7 +10,7 @@ export const registerMessage = async (params: RegisterMessageParams, prisma: any
 	kvpArrayCreate.push({ k:'likeCount', v: 1 });
 	kvpArrayCreate.push({ k:'dislikeCount', v: 1 });
 	kvpArrayCreate.push({ k:'interactions', v: 2 });
-	if (content) kvpArrayCreate.push({ k:'content', v: content });
+	kvpArrayCreate.push({ k:'content', v: content ?? {} });
 
 	const kvpArrayUpdate : kvp[] = await getDefaultKvp(params);
 	if (likeCount) kvpArrayUpdate.push({ k:'likeCount', v: likeCount });
@@ -29,7 +29,7 @@ export const likeAdd = async (params: RegisterMessageParams, prisma: any) => {
 	if (likeCount) kvpArrayCreate.push({ k:'likeCount', v: likeCount });
 	if (dislikeCount) kvpArrayCreate.push({ k:'dislikeCount', v: dislikeCount });
 	if (interactions) kvpArrayCreate.push({ k:'interactions', v: interactions });
-	if (content) kvpArrayCreate.push({ k:'content', v: content });
+	kvpArrayCreate.push({ k:'content', v: content ?? {} });
 
 	const kvpArrayUpdate : kvp[] = await getDefaultKvp(params);
 	kvpArrayUpdate.push({ k:'interactions', v: interactions });
@@ -47,7 +47,7 @@ export const dislikeAdd = async (params: RegisterMessageParams, prisma: any) => 
 	if (likeCount) kvpArrayCreate.push({ k:'likeCount', v: likeCount });
 	if (dislikeCount) kvpArrayCreate.push({ k:'dislikeCount', v: dislikeCount });
 	if (interactions) kvpArrayCreate.push({ k:'interactions', v: interactions });
-	if (content) kvpArrayCreate.push({ k:'content', v: content });
+	kvpArrayCreate.push({ k:'content', v: content ?? {} });
 
 	const kvpArrayUpdate : kvp[] = await getDefaultKvp(params);
 	kvpArrayUpdate.push({ k:'interactions', v: interactions });
@@ -65,7 +65,7 @@ export const likeRemove = async (params: RegisterMessageParams, prisma: any) => 
 	if (likeCount) kvpArrayCreate.push({ k:'likeCount', v: likeCount });
 	if (dislikeCount) kvpArrayCreate.push({ k:'dislikeCount', v: dislikeCount });
 	if (interactions) kvpArrayCreate.push({ k:'interactions', v: interactions });
-	if (content) kvpArrayCreate.push({ k:'content', v: content });
+	kvpArrayCreate.push({ k:'content', v: content ?? {} });
 
 	const kvpArrayUpdate : kvp[] = await getDefaultKvp(params);
 	kvpArrayUpdate.push({ k:'interactions', v: interactions });
@@ -82,7 +82,7 @@ export const dislikeRemove = async (params: RegisterMessageParams, prisma: any) 
 	if (likeCount) kvpArrayCreate.push({ k:'likeCount', v: likeCount });
 	if (dislikeCount) kvpArrayCreate.push({ k:'dislikeCount', v: dislikeCount });
 	if (interactions) kvpArrayCreate.push({ k:'interactions', v: interactions });
-	if (content) kvpArrayCreate.push({ k:'content', v: content });
+	kvpArrayCreate.push({ k:'content', v: content ?? {} });
 
 	const kvpArrayUpdate : kvp[] = await getDefaultKvp(params);
 	kvpArrayUpdate.push({ k:'interactions', v: interactions });
