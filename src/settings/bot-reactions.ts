@@ -3,8 +3,8 @@ import { ServerSettings } from './configure';
 // Only our own converted Media-Helper replies may be voted on; other WHTBA messages stay excluded.
 export const isFixedMediaReplyContent = (content: string | null | undefined): boolean => {
   const text = content ?? '';
-  // Support both new inline-code labels and older compact plain labels.
-  const compact = /^-# \[([\x60]?)([a-z]+(?:-[A-Za-z0-9_-]{2,64}(?:\.mp4)?)?)\1\]\((https:\/\/[^\s)]+)\)/.exec(text);
+  // Normal-size links and historical small-text links remain eligible for votes.
+  const compact = /^(?:-# )?\[([\x60]?)([a-z]+(?:-[A-Za-z0-9_-]{2,64}(?:\.mp4)?)?)\1\]\((https:\/\/[^\s)]+)\)/.exec(text);
   if (compact) {
     try {
       const host = new URL(compact[3]).hostname.toLowerCase();

@@ -102,5 +102,5 @@ export const mediaLabel = (link: MediaLink): string => {
 // Inline-code styling inside a masked link; the bot does not upload a media file.
 export const proxyEmbedLine = (link: MediaLink): string => {
   const tick = String.fromCharCode(96);
-  return '-# [' + tick + mediaLabel(link) + tick + '](' + link.fixed + ')';
+  return '[' + tick + mediaLabel(link) + tick + '](' + link.fixed + ')';
 };

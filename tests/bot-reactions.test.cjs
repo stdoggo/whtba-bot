@@ -89,7 +89,7 @@ test('other bots receive initial reactions for qualifying media only when enable
 });
 
 test('own converted-link replies are eligible when enabled, ordinary WHTBA messages are not', () => {
-  const converted = '-# [`twitter-123`](https://fxtwitter.com/u/status/123)';
+  const converted = '[`twitter-123`](https://fxtwitter.com/u/status/123)';
   const own = { id: selfId, bot: true };
   assert.equal(isFixedMediaReplyContent(converted), true);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, converted), true);
@@ -102,7 +102,7 @@ test('own converted-link replies are eligible when enabled, ordinary WHTBA messa
 
 test('compact and legacy replies are countable, ordinary bot messages are not', () => {
   const oldText = '-# [View original](<https://x.com/u>)\n-# https://fxtwitter.com/u';
-  const compact = '-# [`tiktok-ABC.mp4`](https://vt.tnktok.com/ABC/)';
+  const compact = '[`tiktok-ABC.mp4`](https://vt.tnktok.com/ABC/)';
   assert.equal(isFixedMediaReplyContent(oldText), true);
   assert.equal(isFixedMediaReplyContent(compact), true);
   assert.equal(isFixedMediaReplyContent('View original · tik-ABC.mp4'), false);
@@ -112,4 +112,11 @@ test('compact and legacy replies are countable, ordinary bot messages are not', 
   assert.equal(isFixedMediaReplyContent('-# [facebook](https://facebed.seria.moe/reel/123)'), true);
   assert.equal(isFixedMediaReplyContent('-# [twitter](https://example.com/phishing)'), false);
   assert.equal(isFixedMediaReplyContent('-# [tiktok-ABC.mp4](https://example.com/ABC)'), false);
+});
+
+test('new normal-size linked code labels count as fixed media replies while old small labels still work', () => {
+  assert.equal(isFixedMediaReplyContent('[`twitter-123`](https://fxtwitter.com/a/status/123)'), true);
+  assert.equal(isFixedMediaReplyContent('-# [`twitter-123`](https://fxtwitter.com/a/status/123)'), true);
+  assert.equal(isFixedMediaReplyContent('[`tiktok-ABC.mp4`](https://vt.tnktok.com/ABC)'), true);
+  assert.equal(isFixedMediaReplyContent('[`twitter-123`](https://fake.example/a)'), false);
 });
