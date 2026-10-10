@@ -2,7 +2,9 @@ import 'dotenv/config';
 import { allowedGuildId } from './private-server';
 import { Client, Events, GatewayIntentBits, MessageReaction, PartialMessageReaction, PartialUser, Partials, User } from 'discord.js';
 import { processMessage } from './handlers/message';
-import { findSocialLinks, handleSocialLinks } from './handlers/social-links';
+import { findMediaLinks } from './media/sites';
+import { handleAutomaticMedia } from './media/automatic';
+import { isMediaComponent, isMediaContextCommand, processMediaComponent, processMediaContext } from './media/interactions';
 import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
@@ -75,10 +77,12 @@ discordClient.once('ready', async () => {
 // Messages
 discordClient.on(Events.MessageCreate, (message: any) => {
 	if (message.guildId !== allowedGuildId || message.author?.bot) return;
-	// Link fixing runs independently of the /select-channels reaction selection.
-	const links = findSocialLinks(message.content ?? '');
+	const links = findMediaLinks(message.content ?? '');
 	if (links.length) {
-		void handleSocialLinks(message, links).catch(error => console.error('Social link handler:', error));
+		void handleAutomaticMedia(message, prismaClient, links)
+			.then(processed => {
+				if (!processed) return processMessage(discordClient, message, prismaClient);
+			}).catch(error => console.error('Media preview handler:', error));
 		return;
 	}
 	void processMessage(discordClient, message, prismaClient).catch(error => console.error('Message handler:', error));
@@ -88,11 +92,20 @@ discordClient.on(Events.MessageCreate, (message: any) => {
 discordClient.on(Events.InteractionCreate, async interaction => {
 	if (interaction.guildId !== allowedGuildId) return;
 	if (interaction.isCommand()) {
-		await processCommand(discordClient, interaction);
+		if ('isMessageContextMenuCommand' in interaction && interaction.isMessageContextMenuCommand() &&
+			isMediaContextCommand(interaction.commandName)) {
+			await processMediaContext(interaction);
+		} else {
+			await processCommand(discordClient, interaction);
+		}
 	}
 	else if ((interaction.isChannelSelectMenu() || interaction.isButton()) &&
 		isSelectChannelsComponent(interaction.customId)) {
 		await processSelectChannelsComponent(interaction);
+	}
+	else if ((interaction.isButton() || interaction.isModalSubmit()) &&
+		isMediaComponent(interaction.customId)) {
+		await processMediaComponent(interaction, discordClient);
 	}
 });
 

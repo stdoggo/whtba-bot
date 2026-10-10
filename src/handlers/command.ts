@@ -4,7 +4,7 @@ import { isValidEnvironment } from '../utils';
 import { PermissionsBitField } from 'discord.js';
 
 export const processCommand = async (client: Client, interaction: any) => {
-	await interaction.deferReply({ ephemeral: interaction.commandName === 'select-channels' });
+	await interaction.deferReply({ ephemeral: ['select-channels','settings'].includes(interaction.commandName) });
 	const slashCommand = Commands.find(c => c.name === interaction.commandName);
 	if (!slashCommand) {
 		interaction.followUp({ content: `An error has occurred; command: ${interaction.commandName} does not exist.` + '\nYardım için sunucu yöneticisine başvur.' });
@@ -24,6 +24,7 @@ export const processCommand = async (client: Client, interaction: any) => {
 			slashCommand.run(client, interaction);
 			break;
 		case 'select-channels':
+		case 'settings':
 			await slashCommand.run(client, interaction);
 			break;
 		default: // All other commands are only available if we're in a valid environment, which requires setupserver to run.

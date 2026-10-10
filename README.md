@@ -68,6 +68,27 @@ For messages containing X/Twitter, Reddit or TikTok links, the bot replies to th
 
 The MP4 downloader is best-effort and requires the third-party TikWM service; fallback previews require `d.tnktok.com` to be available. Both services are independent of this project's database, and requests to these services disclose the shared link to them. The bot does not cache videos.
 
+
+## Expanded media features
+
+**Supported sites:** TikTok, Instagram Reels/posts, X/Twitter, Reddit, Bluesky, Twitch clips, YouTube Shorts, Facebook Reels/videos, Vimeo, Streamable, and Dailymotion.
+Links automatically receive a reply without pinging the original author. X, Reddit, Instagram and Bluesky use embed proxy links. TikTok and other video sites attempt a native Discord MP4 upload when yt-dlp and FFmpeg are available, then fall back to a link. The original preview is suppressed when Manage Messages is granted.
+
+**Convert via right-click:** Apps > Convert media opens a modal. Accepted formats: mp3, wav, gif, mp4, webm. Special operations: mute, reverse, speed, trim, caption. Optional fields: start time, duration, speed (0.5-2), and caption text. MP3, GIF, Trim, Mute, Caption shortcut buttons appear under single-link replies (toggle via settings).
+
+**Soundboard:** Apps > Upload to soundboard opens a name prompt, converts five seconds into mono MP3, and uploads through the Discord soundboard API. Requires Create Guild Expressions permission for the user and bot.
+
+**Admin:** /settings shows/changes media preview toggle, quick actions, ephemeral replies for conversions, native uploads, soundboard and per-server allowed media channels. /select-channels controls only emoji reactions, *not* media previews or conversions. Media previews are enabled in all channels by default. /settings channel-add restricts media to an allowlist; channel-all restores all channels.
+
+**External tools:** Install yt-dlp and FFmpeg, ensuring both are on PATH (or set YTDLP_PATH and FFMPEG_PATH). Windows:
+
+    winget install yt-dlp.yt-dlp
+    winget install Gyan.FFmpeg
+
+Run npm run updatecommands to register context menus and the new slash command, then npm start. Bot permissions: View Channel, Read Message History, Send Messages, Embed Links, Attach Files, Manage Messages; Create Guild Expressions for soundboard. Message Content Intent must be enabled.
+
+**Limits:** Up to two active conversions; 25 MiB source and 8 MiB output; automatic uploads at most 45 seconds, GIFs 10 seconds, reverse 12 seconds, soundboard 5 seconds. Media stays in temporary files while processing and is removed after completion. Service and site availability vary; DRM and private media may not work.
+
 ## Behavior
 
 The bot listens for new messages and reaction additions/removals. It adds its two initial reactions to qualifying messages and stores reaction counters. Messages and reactions from bot accounts are ignored.
@@ -110,6 +131,7 @@ The regression suite covers identifier precision, database query conversions, pr
 - `src/commands/` — Slash command definitions and handlers.
 - `src/handlers/` — Message/reaction processing and independent social-link previews.
 - `src/settings/reaction-channels.ts` — Reaction channel filtering and selection logic.
+- `src/media/` — Media conversion, platform routing and media settings.
 - `src/queries/` — Database operations and identifier conversion.
 - `src/scripts/register-commands.ts` — Guild-scoped command registration.
 - `prisma/schema.prisma` — Database schema.

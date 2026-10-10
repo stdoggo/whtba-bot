@@ -13,6 +13,7 @@ export const defaultChannelSettings : ChannelSettings = {
 };
 
 export interface ServerSettings {
+    mediaHelper?: import('../media/settings').MediaHelperSettings;
     likeReaction: string; // The reaction that will be used to like a message.
     dislikeReaction: string; // The reaction that will be used to dislike a message.
     hallOfFameReaction: string; // The reaction that will be used to send a message to the hall of fame channel.

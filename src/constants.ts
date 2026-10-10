@@ -38,7 +38,8 @@ import { help } from './commands/help';
 import { setupserver } from './commands/setupserver';
 import { setupchannel } from './commands/setupchannel';
 import { selectChannels } from './commands/select-channels';
-export const Commands: Command[] = [help, setupserver, setupchannel, selectChannels];
+import { settingsCommand } from './commands/settings';
+export const Commands: Command[] = [help, setupserver, setupchannel, selectChannels, settingsCommand];
 
 export const NOT_REGISTERED_MESSAGE = 'Server is not registered ❌\nPlease run `/setupserver` to register this server';
 export const HELP_MESSAGE = 'WHTBA bot — özel sunucu medya beğeni botu.' +
@@ -47,5 +48,6 @@ export const HELP_MESSAGE = 'WHTBA bot — özel sunucu medya beğeni botu.' +
 '\n`/setupserver allow-embed-reactions:Allow all` Bağlantı önizlemelerine de tepki ekler.' +
 '\n`/setupchannel` Bu kanalın medya ve yazı kurallarını düzenler.' +
 '\n`/select-channels` Emoji eklenecek kanalları çoklu seçimle yönetir.' +
+'\n`/settings` Medya özelliklerini ve kanalları yönetir.' +
 '\n`/setupchannel forbid-text:Messages must contain content` Medyasız mesajları siler.' +
 '\nAyarları değiştirmek için Sunucuyu Yönet yetkisi gerekir. Yardım için sunucu yöneticisine başvur.';
