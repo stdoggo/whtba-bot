@@ -72,7 +72,7 @@ const executeConversion = async (
 	options: ConvertOptions,
 ) => {
 	if (!interaction.guildId) throw new Error('Bu işlem sunucuda kullanılabilir.');
-	const preferences = await enabled(interaction.guildId, interaction.channelId);
+	const preferences = await enabled(interaction.guildId, interaction.channelId ?? '');
 	await interaction.deferReply({ ephemeral: preferences.ephemeralReplies });
 	const url = findSourceUrl(source);
 	if (!url) throw new Error('Mesajda desteklenen bir video/ses dosyası veya bağlantısı bulunamadı.');
@@ -85,7 +85,7 @@ const executeConversion = async (
 
 const executeSoundboard = async (interaction: ModalSubmitInteraction, source: Message, client: Client) => {
 	if (!interaction.guildId || !interaction.guild) throw new Error('Bu işlem sunucuda kullanılabilir.');
-	const preferences = await enabled(interaction.guildId, interaction.channelId);
+	const preferences = await enabled(interaction.guildId, interaction.channelId ?? '');
 	if (!preferences.soundboard) throw new Error('Soundboard yükleme bu sunucuda kapalı.');
 	if (!interaction.memberPermissions?.has(1n << 43n))
 		throw new Error('Soundboard için Ses/İfade Oluştur yetkisi gerekli.');
@@ -96,7 +96,7 @@ const executeSoundboard = async (interaction: ModalSubmitInteraction, source: Me
 	if (!url) throw new Error('Yüklenebilir medya bulunamadı.');
 	const media = await runConversion(url, normalizeOptions('soundboard'));
 	const sound = 'data:audio/mpeg;base64,' + media.buffer.toString('base64');
-	await client.rest.post('/guilds/' + interaction.guildId + '/soundboard-sounds', {
+	await client.rest.post(('/guilds/' + interaction.guildId + '/soundboard-sounds') as `/${string}`, {
 		body: { name, sound, volume: 1 },
 	});
 	await interaction.editReply({ content: 'Soundboard sesine eklendi: **' + name + '**' });
@@ -115,7 +115,7 @@ export const processMediaContext = async (interaction: MessageContextMenuCommand
 		await interaction.reply({ content: 'Bu komut sunucuda kullanılabilir.', ephemeral: true }); return;
 	}
 	try {
-		const settings = await enabled(interaction.guildId, interaction.channelId);
+		const settings = await enabled(interaction.guildId, interaction.channelId ?? '');
 		if (interaction.commandName === 'Convert media') {
 			await showConvertModal(interaction, interaction.targetId);
 		} else if (interaction.commandName === 'Upload to soundboard') {
@@ -137,7 +137,7 @@ export const processMediaComponent = async (interaction: ButtonInteraction | Mod
 		if (!/^\d{17,20}$/.test(id || '')) throw new Error('Geçersiz mesaj.');
 		const source = await getOriginalMessage(interaction, id);
 		if (interaction.isButton()) {
-			const settings = await enabled(interaction.guildId, interaction.channelId);
+			const settings = await enabled(interaction.guildId, interaction.channelId ?? '');
 			if (!settings.quickActions) throw new Error('Hızlı işlem butonları kapalı.');
 			if (action === 'trim' || action === 'caption') {
 				await showConvertModal(interaction, id, action);
