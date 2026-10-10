@@ -2,6 +2,7 @@ import { Attachment, Embed, Message, PartialMessage, TextChannel } from 'discord
 import { createUser } from '../queries/create-user';
 import { getChannelSettings } from '../queries/get-channel-settings';
 import { getServerSettings } from '../queries/get-server-settings';
+import { isReactionChannelAllowed } from '../settings/reaction-channels';
 import { getUserLocal } from '../queries/get-user-local';
 import { isValidEnvironment, processInitialReactions } from '../utils';
 import { RegisterMessageParams, registerMessage } from '../queries/register-message';
@@ -87,7 +88,8 @@ export const processMessage = async (client: any, m: Message | PartialMessage, p
 	if(!userExists && message?.author?.username) {
 		await createUser(userId, serverId, message?.author?.username, prisma);
 	}
-	if (isReactableEmbed || message.attachments.first()) {
+	if ((isReactableEmbed || message.attachments.first()) &&
+		isReactionChannelAllowed(results[2]?.settings, channelId)) {
 		await processInitialReactions(message, results[2]?.settings);
 		registerMessage(getMessageParams(channelId, serverId, userId, message), prisma);
 	}

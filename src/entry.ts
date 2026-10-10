@@ -5,6 +5,7 @@ import { processMessage } from './handlers/message';
 import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
+import { isSelectChannelsComponent, processSelectChannelsComponent } from './commands/select-channels';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { createPrismaRedisCache } from 'prisma-redis-middleware';
 
@@ -78,8 +79,14 @@ discordClient.on(Events.MessageCreate, (message: any) => {
 
 // Slash commands
 discordClient.on(Events.InteractionCreate, async interaction => {
-	if (!interaction.isCommand() || interaction.guildId !== allowedGuildId) return;
-	await processCommand(discordClient, interaction);
+	if (interaction.guildId !== allowedGuildId) return;
+	if (interaction.isCommand()) {
+		await processCommand(discordClient, interaction);
+	}
+	else if ((interaction.isChannelSelectMenu() || interaction.isButton()) &&
+		isSelectChannelsComponent(interaction.customId)) {
+		await processSelectChannelsComponent(interaction);
+	}
 });
 
 // Reactions

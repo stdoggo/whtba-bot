@@ -18,6 +18,7 @@ export interface ServerSettings {
     hallOfFameReaction: string; // The reaction that will be used to send a message to the hall of fame channel.
     hallOfFameChannel?: string; // If true, will send any messages that get enough likes to the hall of fame channel.
     allowEmbedReactions?: number; // See the setupserver.ts
+    reactionChannelIds?: string[]; // When saved, limit auto reactions to these channels.
 }
 
 export interface ChannelSettings {

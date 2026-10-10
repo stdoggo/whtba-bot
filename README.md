@@ -10,6 +10,7 @@ A Discord bot that adds like and dislike reactions to shared attachments and sup
 - Configurable reactions for link previews, including images and playable videos.
 - Custom server-wide reaction emojis.
 - Channel-specific embed settings and optional media-only moderation.
+- Multi-select reaction channel management via `/select-channels`.
 - Persistent settings and message reaction counters in PostgreSQL.
 - Event handling and slash command registration scoped to one configured server.
 
@@ -35,6 +36,12 @@ Registers the server or updates its settings.
 
 Link preview reactions are disabled by default. Attachment reactions remain enabled. Custom emojis must belong to the configured server.
 
+### `/select-channels`
+
+Run this slash command to choose where the bot automatically adds like/dislike reactions. Use the first channel picker to **add up to 25 channels at once**, the second picker to remove channels, and the clear button to save an empty selection (disabling reactions everywhere). Run the command or use the picker again to add more than 25 channels.
+
+The selection persists in the existing `ServerSettings` JSON column; no migration is required. Before the first explicit selection, existing servers retain their previous behavior of reacting in all channels.
+
 ### `/setupchannel`
 
 Updates settings for the channel where the command is run.
@@ -42,7 +49,7 @@ Updates settings for the channel where the command is run.
 - `forbid-text` — Allows all messages or deletes messages without qualifying content. Text messages are allowed by default.
 - `allow-embed-reactions` — Inherits the server setting or overrides it for the current channel.
 
-Disabling embed reactions does not disable attachment reactions. Use Discord channel permissions to control which channels the bot can access. Reaction emojis are configured at the server level, not per channel.
+Disabling embed reactions does not disable attachment reactions. Use `/select-channels` to restrict the channels receiving reactions. Discord permissions still control what the bot can access. Reaction emojis are configured at the server level, not per channel.
 
 ## Behavior
 
@@ -85,6 +92,7 @@ The regression suite covers identifier precision, database query conversions, pr
 - `src/private-server.ts` — Private server configuration.
 - `src/commands/` — Slash command definitions and handlers.
 - `src/handlers/` — Message and reaction processing.
+- `src/settings/reaction-channels.ts` — Reaction channel filtering and selection logic.
 - `src/queries/` — Database operations and identifier conversion.
 - `src/scripts/register-commands.ts` — Guild-scoped command registration.
 - `prisma/schema.prisma` — Database schema.
