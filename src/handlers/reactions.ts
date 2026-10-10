@@ -22,7 +22,7 @@ export const processReaction = async (client: Client, reaction: MessageReaction 
 	if (!serverId) return;
 	const serverSettings = await getServerSettings(serverId, prisma);
 	if (!serverSettings || !isReactionChannelAllowed(serverSettings.settings, m.channel.id) ||
-		!isReactionAuthorAllowed(m.author, client.user?.id, serverSettings.settings)) return;
+		!isReactionAuthorAllowed(m.author, client.user?.id, serverSettings.settings, m.content)) return;
 
 	const likeReaction : string = serverSettings?.settings?.likeReaction;
 	const dislikeReaction : string = serverSettings?.settings?.dislikeReaction;

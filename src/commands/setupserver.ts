@@ -45,7 +45,7 @@ export const setupserver: Command = {
 		{
 			type: ApplicationCommandOptionType.Boolean,
 			name: 'react-to-bots',
-			description: 'Add like/dislike reactions to media posted by other bots (default: off).',
+			description: 'React to other bots and WHTBA fixed-link replies (default: off).',
 		}, /*
 		{
 			type: ApplicationCommandOptionType.String,

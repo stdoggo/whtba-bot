@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import { allowedGuildId } from './private-server';
 import { Client, Events, GatewayIntentBits, MessageReaction, PartialMessageReaction, PartialUser, Partials, User } from 'discord.js';
-import { processMessage } from './handlers/message';
+import { processMessage, getMessageParams } from './handlers/message';
+import { processInitialReactions } from './utils';
+import { registerMessage } from './queries/register-message';
 import { findMediaLinks } from './media/sites';
 import { handleAutomaticMedia } from './media/automatic';
 import { processLoad } from './handlers/load';
@@ -84,8 +86,10 @@ discordClient.on(Events.MessageCreate, (message: any) => {
 	}
 	const links = findMediaLinks(message.content ?? '');
 	if (links.length) {
-		void handleAutomaticMedia(message, prismaClient, links)
-			.then(processed => {
+		void handleAutomaticMedia(message, prismaClient, links, async (reply, settings) => {
+			await processInitialReactions(reply, settings);
+			await registerMessage(getMessageParams(reply.channel.id, reply.guild!.id, reply.author.id, reply), prismaClient);
+		}).then(processed => {
 				if (!processed) return processMessage(discordClient, message, prismaClient);
 			}).catch(error => console.error('Media preview handler:', error));
 		return;

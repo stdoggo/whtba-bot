@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 require('ts-node/register/transpile-only');
-const { isReactionAuthorAllowed } = require('../src/settings/bot-reactions');
+const { isReactionAuthorAllowed, isFixedMediaReplyContent } = require('../src/settings/bot-reactions');
 const { isReactionChannelAllowed } = require('../src/settings/reaction-channels');
 
 const selfId = '123456789012345670';
@@ -86,4 +86,15 @@ test('other bots receive initial reactions for qualifying media only when enable
   await processMessage(client, message, {});
   assert.equal(message.reactionCalls, 1);
   assert.equal(registered, 2);
+});
+
+test('own converted-link replies are eligible when enabled, ordinary WHTBA messages are not', () => {
+  const converted = '-# [View original](<https://x.com/u/status/123>)\n-# https://fxtwitter.com/u/status/123';
+  const own = { id: selfId, bot: true };
+  assert.equal(isFixedMediaReplyContent(converted), true);
+  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, converted), true);
+  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: false }, converted), false);
+  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, 'Bot started'), false);
+  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, '-# [View original](<https://x.com/u>)'), false);
+  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, ''), false);
 });

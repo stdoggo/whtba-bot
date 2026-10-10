@@ -1,12 +1,17 @@
 import { ServerSettings } from './configure';
 
-// Treat other bots as eligible authors only after explicit guild opt-in.
-// Self-posts always remain excluded to avoid reactions on bot-generated replies.
+// Only our own converted Media-Helper replies may be voted on; other WHTBA messages stay excluded.
+export const isFixedMediaReplyContent = (content: string | null | undefined): boolean =>
+	/^-# \[View original\]\(<https?:\/\/[^\s<>]+>\)\n-# https?:\/\/[^\s<>]+/.test(content ?? '');
 export const isReactionAuthorAllowed = (
 	author: { id?: string; bot?: boolean } | null | undefined,
 	ownBotId: string | undefined,
 	settings?: Pick<ServerSettings, 'reactToBots'> | null,
+	content?: string | null,
 ): boolean => {
-	if (!author?.id || (ownBotId && author.id === ownBotId)) return false;
+	if (!author?.id) return false;
+	if (ownBotId && author.id === ownBotId) {
+		return settings?.reactToBots === true && isFixedMediaReplyContent(content);
+	}
 	return !author.bot || settings?.reactToBots === true;
 };

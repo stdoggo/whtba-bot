@@ -88,3 +88,28 @@ test('disabled channels, bot messages and failed replies are handled safely', as
   await assert.rejects(handleAutomaticMedia(message, { serverSettings: { findFirst: async () => null } }));
   assert.equal(suppressed, false);
 });
+
+test('converted WHTBA reply receives reactions only with react-to-bots enabled in a selected channel', async () => {
+  const ownChannel = '123456789012345678';
+  const otherChannel = '123456789012345679';
+  const state = { reactToBots: true, reactionChannelIds: [ownChannel], mediaHelper: { enabled: true } };
+  const prisma = { serverSettings: { findFirst: async () => ({ settings: state }) } };
+  const seen = [];
+  const create = (channelId) => ({
+    guildId: '123456789012345677', channelId, author: { bot: false },
+    content: 'https://x.com/test/status/123',
+    reply: async () => ({ id: '123456789012345676', channelId }),
+    suppressEmbeds: async () => {}
+  });
+  const onFixedReply = async (reply, settings) => seen.push({ reply, settings });
+  await handleAutomaticMedia(create(ownChannel), prisma, undefined, onFixedReply);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].reply.id, '123456789012345676');
+  assert.equal(seen[0].settings.reactToBots, true);
+  state.reactToBots = false;
+  await handleAutomaticMedia(create(ownChannel), prisma, undefined, onFixedReply);
+  assert.equal(seen.length, 1);
+  state.reactToBots = true;
+  await handleAutomaticMedia(create(otherChannel), prisma, undefined, onFixedReply);
+  assert.equal(seen.length, 1);
+});

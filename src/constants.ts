@@ -46,7 +46,7 @@ export const HELP_MESSAGE = 'WHTBA bot — özel sunucu medya beğeni botu.' +
 '\n`/setupserver` Sunucu ayarlarını oluşturur veya günceller.' +
 '\n`/setupserver like-reaction:👍 dislike-reaction:👎` Tepki emojilerini belirler.' +
 '\n`/setupserver allow-embed-reactions:Allow all` Bağlantı önizlemelerine de tepki ekler.' +
-'\n`/setupserver react-to-bots:true` Diğer botların medya mesajlarına da emoji ekler (varsayılan: kapalı).' +
+'\n`/setupserver react-to-bots:true` Diğer botların medyasına ve WHTBA link yanıtlarına emoji ekler.' +
 '\n`/setupchannel` Bu kanalın medya ve yazı kurallarını düzenler.' +
 '\n`/select-channels` Emoji eklenecek kanalları çoklu seçimle yönetir.' +
 '\n`/settings` Medya özelliklerini ve kanalları yönetir.' +
