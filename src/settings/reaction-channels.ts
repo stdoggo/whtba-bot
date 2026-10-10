@@ -3,8 +3,9 @@ import { ServerSettings } from './configure';
 // Undefined means the server has not configured a channel filter yet (legacy behavior).
 // An explicit empty array means no automatic reactions in any channel.
 export const getReactionChannelIds = (settings: ServerSettings | null | undefined): string[] | undefined => {
-	if (!Array.isArray(settings?.reactionChannelIds)) return undefined;
-	return settings.reactionChannelIds.filter(id => typeof id === 'string' && /^\d{17,20}$/.test(id));
+	const channelIds = settings?.reactionChannelIds;
+	if (!Array.isArray(channelIds)) return undefined;
+	return channelIds.filter(id => typeof id === 'string' && /^\d{17,20}$/.test(id));
 };
 
 export const isReactionChannelAllowed = (settings: ServerSettings | null | undefined, channelId: string): boolean => {
