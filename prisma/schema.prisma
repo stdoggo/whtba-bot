@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Message {
+  id        BigInt      @id @unique @default(autoincrement())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  worldUserId BigInt
+  serverId BigInt
+  channelId BigInt
+  content Json @default("{}")
+  likeCount Int @default(1)
+  dislikeCount Int @default(1)
+  interactions Int @default(2)
+  channelName String?
+  serverName String?
+  userName String?
+}
+
+model WorldUser {
+  id      BigInt @id @unique // This uses your discord accounts ID
+  worldId BigInt @default(1)
+  world   World? @relation(fields: [worldId], references: [id])
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  globalBalance Int         @default(0)
+  lastKnownName String      @default("?")
+  localUsers    LocalUser[]
+}
+
+model LocalUser {
+  id              BigInt     @id // This is the discord server id!
+  discordServerId BigInt?
+  worldUserId     BigInt?
+  server          Server?    @relation(fields: [discordServerId], references: [id])
+  worldUser       WorldUser? @relation(fields: [worldUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  balance   Int      @default(0)
+}
+
+model Server {
+  id               BigInt         @id @unique // This uses the discord server ID
+  worldId          BigInt
+  world            World?         @relation(fields: [worldId], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  users            LocalUser[]
+  channelSettings  ChannelSettings[] 
+  settings         ServerSettings? 
+}
+
+// These two settings tables are exactly the same fields wise but are separated due to their different IDs. It may collide if we combine them into one.
+model ServerSettings {
+  id        BigInt   @id @unique // Server ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  server    Server  @relation(fields: [id], references: [id])
+  settings Json? @default("{}")
+  lastKnownName String?     @default("?")
+}
+
+model ChannelSettings {
+  id        BigInt   @id @unique // Channel ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastKnownName String?      @default("?")
+  serverId  BigInt
+  server    Server  @relation(fields: [serverId], references: [id])
+  settings Json? @default("{}")
+}
+
+model World {
+  id        BigInt      @id @unique @default(autoincrement())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  users     WorldUser[]
+  servers   Server[]
+}
