@@ -16,7 +16,7 @@ Private Discord bot configured for one server using `DISCORD_GUILD_ID`. Adds cus
 | YouTube Shorts | Standard YouTube `watch?v=` playable link |
 | Vimeo, Streamable, Dailymotion, `fb.watch` | Original/native URL (if the platform supplies a Discord preview) |
 
-On new human-authored messages, the bot replies without pinging the sender, tries to hide the original preview, and displays a single compact line: `View original · tik-<id>.mp4` for TikTok or `View original · X post` for X and similarly named links for other sites. The right-hand label links to an external embed service; it is not an uploaded MP4. Discord's unfurling of masked links can vary by platform and requires live testing. Up to three URLs per message are supported. Link fixing defaults to **all channels** independently of emoji reaction channel selections.
+On new human-authored messages, the bot replies without pinging the sender, tries to hide the original preview, and displays **only one compact linked label**: `tiktok-<id>.mp4` for TikTok or `twitter`, `facebook`, `instagram`, `reddit`, etc. for other sites. There is no `View original` link or raw URL in the reply. The clickable label targets the external embed service; the bot never uploads an MP4. Discord may not generate a playable preview for masked Markdown links, so verify this visually in the live server. Up to three URLs per message are supported. Link fixing defaults to **all channels** independently of emoji reaction channel selections.
 
 ## Commands
 

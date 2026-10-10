@@ -38,7 +38,7 @@ test('only exact domains accepted; duplicate links discarded and original link p
   const links = findMediaLinks('https://x.com/a, https://x.com/a https://reddit.com/r/a https://vm.tiktok.com/a https://vimeo.com/123');
   assert.equal(links.length, 3);
   assert.equal(links[0].original, 'https://x.com/a');
-  assert.equal(proxyEmbedLine(links[0]), '-# [View original](<https://x.com/a>) · [X post](https://fxtwitter.com/a)');
+  assert.equal(proxyEmbedLine(links[0]), '-# [twitter](https://fxtwitter.com/a)');
 });
 
 test('media options ignore old conversion settings and are separate from reaction channels', () => {
@@ -115,15 +115,13 @@ test('converted WHTBA reply receives reactions only with react-to-bots enabled i
 });
 
 
-test('TikTok links are compact and have clickable file-style proxy labels', () => {
+test('TikTok links use only clickable tiktok-<id>.mp4 labels without View original', () => {
   const long = mediaLinkFromUrl('https://www.tiktok.com/@steammhappy/video/7689983778025901343');
   assert.equal(proxyEmbedLine(long),
-    '-# [View original](<https://www.tiktok.com/@steammhappy/video/7689983778025901343>) · ' +
-    '[tik-7689983778025901343.mp4](https://tnktok.com/@steammhappy/video/7689983778025901343)');
+    '-# [tiktok-7689983778025901343.mp4](https://tnktok.com/@steammhappy/video/7689983778025901343)');
   const short = mediaLinkFromUrl('https://vt.tiktok.com/ZSbq2xBye/');
   assert.equal(proxyEmbedLine(short),
-    '-# [View original](<https://vt.tiktok.com/ZSbq2xBye/>) · ' +
-    '[tik-ZSbq2xBye.mp4](https://vt.tnktok.com/ZSbq2xBye/)');
+    '-# [tiktok-ZSbq2xBye.mp4](https://vt.tnktok.com/ZSbq2xBye/)');
   assert.equal(proxyEmbedLine(long).split('\n').length, 1);
 });
 
@@ -139,7 +137,9 @@ test('all supported platforms use single-line clickable short labels', () => {
     assert.ok(link);
     const text = proxyEmbedLine(link);
     assert.equal(text.split('\n').length, 1);
-    assert.ok(text.includes(' · ['));
+    assert.ok(text.startsWith('-# ['));
+    assert.ok(!text.includes('View original'));
+    assert.ok(!text.includes(' · '));
     assert.ok(text.endsWith('](' + link.fixed + ')'));
   }
 });
