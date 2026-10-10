@@ -89,7 +89,7 @@ test('other bots receive initial reactions for qualifying media only when enable
 });
 
 test('own converted-link replies are eligible when enabled, ordinary WHTBA messages are not', () => {
-  const converted = '-# [View original](<https://x.com/u/status/123>)\n-# https://fxtwitter.com/u/status/123';
+  const converted = '-# [View original](<https://x.com/u/status/123>) · [X post](https://fxtwitter.com/u/status/123)';
   const own = { id: selfId, bot: true };
   assert.equal(isFixedMediaReplyContent(converted), true);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, converted), true);
@@ -97,4 +97,13 @@ test('own converted-link replies are eligible when enabled, ordinary WHTBA messa
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, 'Bot started'), false);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, '-# [View original](<https://x.com/u>)'), false);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, ''), false);
+});
+
+
+test('compact and legacy replies are countable, ordinary bot messages are not', () => {
+  const oldText = '-# [View original](<https://x.com/u>)\n-# https://fxtwitter.com/u';
+  const compact = '-# [View original](<https://vt.tiktok.com/ABC/>) · [tik-ABC.mp4](https://vt.tnktok.com/ABC/)';
+  assert.equal(isFixedMediaReplyContent(oldText), true);
+  assert.equal(isFixedMediaReplyContent(compact), true);
+  assert.equal(isFixedMediaReplyContent('View original · tik-ABC.mp4'), false);
 });

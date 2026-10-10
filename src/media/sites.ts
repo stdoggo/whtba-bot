@@ -71,4 +71,28 @@ export const findMediaLinks = (content: string): MediaLink[] => {
 	return links;
 };
 export const originalLinkLine = (url: string): string => '-# [View original](<' + url + '>)';
-export const proxyEmbedLine = (link: MediaLink): string => originalLinkLine(link.original) + '\n-# ' + link.fixed;
+
+// Short click labels are links to the external proxy, not downloaded files.
+// Leave the proxy's URL unwrapped (without <>) for Discord's link unfurler.
+const mediaLabel = (link: MediaLink): string => {
+	if (link.platform === 'tiktok') {
+		try {
+			const url = new URL(link.original);
+			const segments = url.pathname.split('/').filter(Boolean);
+			const video = segments.findIndex(s => s.toLowerCase() === 'video');
+			const id = video >= 0 ? segments[video + 1] :
+				/^(vm|vt)\.tiktok\.com$/i.test(url.hostname) ? segments[0] : undefined;
+			if (id && /^[\w-]{3,32}$/.test(id)) return 'tik-' + id + '.mp4';
+		} catch { /* Fall through. */ }
+		return 'TikTok video';
+	}
+	const names: Record<Exclude<SupportedSite, 'tiktok'>, string> = {
+		x: 'X post', reddit: 'Reddit post', instagram: 'Instagram post',
+		bluesky: 'Bluesky post', youtube: 'YouTube Shorts', twitch: 'Twitch clip',
+		facebook: 'Facebook video', vimeo: 'Vimeo video',
+		streamable: 'Streamable video', dailymotion: 'Dailymotion video',
+	};
+	return names[link.platform];
+};
+export const proxyEmbedLine = (link: MediaLink): string =>
+	originalLinkLine(link.original) + ' · [' + mediaLabel(link) + '](' + link.fixed + ')';
