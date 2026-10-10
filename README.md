@@ -11,6 +11,7 @@ A Discord bot that adds like and dislike reactions to shared attachments and sup
 - Custom server-wide reaction emojis.
 - Channel-specific embed settings and optional media-only moderation.
 - Multi-select reaction channel management via `/select-channels`.
+- Automatic X/Twitter, Reddit and TikTok embed fixing in **all channels**, independent of reaction selections.
 - Persistent settings and message reaction counters in PostgreSQL.
 - Event handling and slash command registration scoped to one configured server.
 
@@ -50,6 +51,22 @@ Updates settings for the channel where the command is run.
 - `allow-embed-reactions` — Inherits the server setting or overrides it for the current channel.
 
 Disabling embed reactions does not disable attachment reactions. Use `/select-channels` to restrict the channels receiving reactions. Discord permissions still control what the bot can access. Reaction emojis are configured at the server level, not per channel.
+
+## Social link previews (all channels)
+
+For messages containing X/Twitter, Reddit or TikTok links, the bot replies to the original message **without pinging** its author and suppresses the embed on the original message.
+
+- `x.com` / `twitter.com` are converted to `fxtwitter.com`.
+- `reddit.com` (including www/old/new/mobile) is converted to `vxreddit.com`.
+- TikTok links are handled as an MP4 upload where the TikWM public service supplies a video smaller than 8 MiB. Otherwise, the bot falls back to the direct media embed service `d.tnktok.com`. TikTok slideshows use the fallback.
+- Each fixed reply includes a clickable **View original** link pointing to the actual submitted URL.
+- Source links and fixed links use Discord's smaller `-#` subtext syntax, while the fixed URL remains available for embed previews.
+- Up to three recognized links in a single message are processed in one reply; MP4 upload is only attempted for a single TikTok URL.
+- These replies operate in every channel in the configured private server, **regardless of `/select-channels`**, even before running `/setupserver`. Source messages with recognized links are not passed to the emoji-reaction/media-only handler.
+
+**Permissions:** The bot needs View Channel, Send Messages, Embed Links, Read Message History and **Manage Messages** to suppress the original preview. Attach Files is required for native TikTok MP4 uploads. Enable Message Content Intent in the Discord Developer Portal. If the original preview remains visible, check Manage Messages.
+
+The MP4 downloader is best-effort and requires the third-party TikWM service; fallback previews require `d.tnktok.com` to be available. Both services are independent of this project's database, and requests to these services disclose the shared link to them. The bot does not cache videos.
 
 ## Behavior
 
@@ -91,7 +108,7 @@ The regression suite covers identifier precision, database query conversions, pr
 - `src/entry.ts` — Bot initialization and event routing.
 - `src/private-server.ts` — Private server configuration.
 - `src/commands/` — Slash command definitions and handlers.
-- `src/handlers/` — Message and reaction processing.
+- `src/handlers/` — Message/reaction processing and independent social-link previews.
 - `src/settings/reaction-channels.ts` — Reaction channel filtering and selection logic.
 - `src/queries/` — Database operations and identifier conversion.
 - `src/scripts/register-commands.ts` — Guild-scoped command registration.

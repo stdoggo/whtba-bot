@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { allowedGuildId } from './private-server';
 import { Client, Events, GatewayIntentBits, MessageReaction, PartialMessageReaction, PartialUser, Partials, User } from 'discord.js';
 import { processMessage } from './handlers/message';
+import { findSocialLinks, handleSocialLinks } from './handlers/social-links';
 import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
@@ -73,8 +74,14 @@ discordClient.once('ready', async () => {
 // List of Discord Events -> https://old.discordjs.dev/#/docs/discord.js/14.11.0/typedef/Events
 // Messages
 discordClient.on(Events.MessageCreate, (message: any) => {
-	if (message.guildId !== allowedGuildId) return;
-	processMessage(discordClient, message, prismaClient);
+	if (message.guildId !== allowedGuildId || message.author?.bot) return;
+	// Link fixing runs independently of the /select-channels reaction selection.
+	const links = findSocialLinks(message.content ?? '');
+	if (links.length) {
+		void handleSocialLinks(message, links).catch(error => console.error('Social link handler:', error));
+		return;
+	}
+	void processMessage(discordClient, message, prismaClient).catch(error => console.error('Message handler:', error));
 });
 
 // Slash commands
