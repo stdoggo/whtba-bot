@@ -38,7 +38,7 @@ test('only exact domains accepted; duplicate links discarded and original link p
   const links = findMediaLinks('https://x.com/a, https://x.com/a https://reddit.com/r/a https://vm.tiktok.com/a https://vimeo.com/123');
   assert.equal(links.length, 3);
   assert.equal(links[0].original, 'https://x.com/a');
-  assert.equal(proxyEmbedLine(links[0]), '-# [twitter](https://fxtwitter.com/a)');
+  assert.equal(proxyEmbedLine(links[0]), '-# [`twitter`](https://fxtwitter.com/a)');
 });
 
 test('media options ignore old conversion settings and are separate from reaction channels', () => {
@@ -118,10 +118,10 @@ test('converted WHTBA reply receives reactions only with react-to-bots enabled i
 test('TikTok links use only clickable tiktok-<id>.mp4 labels without View original', () => {
   const long = mediaLinkFromUrl('https://www.tiktok.com/@steammhappy/video/7689983778025901343');
   assert.equal(proxyEmbedLine(long),
-    '-# [tiktok-7689983778025901343.mp4](https://tnktok.com/@steammhappy/video/7689983778025901343)');
+    '-# [`tiktok-7689983778025901343.mp4`](https://tnktok.com/@steammhappy/video/7689983778025901343)');
   const short = mediaLinkFromUrl('https://vt.tiktok.com/ZSbq2xBye/');
   assert.equal(proxyEmbedLine(short),
-    '-# [tiktok-ZSbq2xBye.mp4](https://vt.tnktok.com/ZSbq2xBye/)');
+    '-# [`tiktok-ZSbq2xBye.mp4`](https://vt.tnktok.com/ZSbq2xBye/)');
   assert.equal(proxyEmbedLine(long).split('\n').length, 1);
 });
 
@@ -137,9 +137,40 @@ test('all supported platforms use single-line clickable short labels', () => {
     assert.ok(link);
     const text = proxyEmbedLine(link);
     assert.equal(text.split('\n').length, 1);
-    assert.ok(text.startsWith('-# ['));
+    assert.ok(text.startsWith('-# [`'));
     assert.ok(!text.includes('View original'));
     assert.ok(!text.includes(' · '));
-    assert.ok(text.endsWith('](' + link.fixed + ')'));
+    assert.ok(text.endsWith('`](' + link.fixed + ')'));
+    assert.ok(!text.includes('View original'));
+    assert.ok(!text.includes('\\n'));
   }
+});
+
+test('post IDs appear after the correct site name on every supported platform', () => {
+  const cases = [
+    ['https://x.com/u/status/1234567890', 'twitter-1234567890'],
+    ['https://reddit.com/r/example/comments/abcd12/post', 'reddit-abcd12'],
+    ['https://instagram.com/reel/Cx12Ab3/', 'instagram-Cx12Ab3'],
+    ['https://bsky.app/profile/person.bsky.social/post/3mka2j', 'bluesky-3mka2j'],
+    ['https://youtube.com/shorts/AbCdEfGh123', 'youtube-AbCdEfGh123'],
+    ['https://clips.twitch.tv/FunnyClipSlug', 'twitch-FunnyClipSlug'],
+    ['https://www.twitch.tv/user/clip/FunnyClipSlug', 'twitch-FunnyClipSlug'],
+    ['https://www.facebook.com/reel/987654321', 'facebook-987654321'],
+    ['https://www.facebook.com/watch/?v=987654321', 'facebook-987654321'],
+    ['https://vimeo.com/34567890', 'vimeo-34567890'],
+    ['https://player.vimeo.com/video/34567890', 'vimeo-34567890'],
+    ['https://streamable.com/abc123', 'streamable-abc123'],
+    ['https://dailymotion.com/video/x9abc12', 'dailymotion-x9abc12'],
+    ['https://dai.ly/x9abc12', 'dailymotion-x9abc12'],
+  ];
+  for (const [url, label] of cases) {
+    const link = mediaLinkFromUrl(url);
+    assert.ok(link, url);
+    assert.equal(proxyEmbedLine(link), '-# [`' + label + '`](' + link.fixed + ')', url);
+  }
+});
+
+test('URLs with no identifiable post number use only the platform name', () => {
+  const link = mediaLinkFromUrl('https://x.com/someuser');
+  assert.equal(proxyEmbedLine(link), '-# [`twitter`](https://fxtwitter.com/someuser)');
 });
