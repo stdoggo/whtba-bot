@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 require('ts-node/register/transpile-only');
+// Importing commands also imports entry/private-server; use a harmless test-only guild ID.
+process.env.DISCORD_GUILD_ID = '123456789012345678';
 const { ApplicationCommandOptionType } = require('discord.js');
 const { Commands } = require('../src/constants');
 
