@@ -130,8 +130,7 @@ export const reactionSettings: Command = {
 				await registerChannelSettings(channelSettings, {
 					channelId,
 					serverId: command.guildId,
-					lastKnownName: target?.name ?? command.channel?.isTextBased() && 'name' in command.channel
-						? (target?.name ?? (command.channel as any).name ?? '?') : '?',
+					lastKnownName: target?.name ?? channelRecord?.lastKnownName ?? '?',
 				}, prismaClient);
 			}
 			await command.editReply((value === null ? '' : 'Kanal ayarı kaydedildi.\n\n') +

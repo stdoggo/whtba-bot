@@ -1,39 +1,21 @@
-import { Client } from 'discord.js';
+import { Client, ChatInputCommandInteraction, PermissionsBitField } from 'discord.js';
 import { Commands } from '../constants';
-import { isValidEnvironment } from '../utils';
-import { PermissionsBitField } from 'discord.js';
 
-export const processCommand = async (client: Client, interaction: any) => {
-	await interaction.deferReply({ ephemeral: ['select-channels','settings'].includes(interaction.commandName) });
-	const slashCommand = Commands.find(c => c.name === interaction.commandName);
-	if (!slashCommand) {
-		interaction.followUp({ content: `An error has occurred; command: ${interaction.commandName} does not exist.` + '\nYardım için sunucu yöneticisine başvur.' });
-		return;
-	}
-	else if (!interaction?.member?.permissions?.has(PermissionsBitField.Flags.ManageGuild)) {
-		interaction.followUp({ content: 'You need admin permissions to manage this bot.' + '\nYardım için sunucu yöneticisine başvur.' });
-		return;
-	}
-
-	let ve;
-	switch (interaction.commandName) {
-		case 'help': // Help command is always available.
-			slashCommand.run(client, interaction);
-			break;
-		case 'setupserver': // Setup server command is available, and also checks within the command if we're inside a valid channel on the server.
-			slashCommand.run(client, interaction);
-			break;
-		case 'select-channels':
-		case 'settings':
-			await slashCommand.run(client, interaction);
-			break;
-		default: // All other commands are only available if we're in a valid environment, which requires setupserver to run.
-			ve = await isValidEnvironment(interaction.guildId);
-			if (ve?.pointOfFailure) {
-				interaction.followUp({ content: ve.pointOfFailure + '\nYardım için sunucu yöneticisine başvur.' });
-				return;
-			}
-			slashCommand.run(client, interaction);
-			break;
-	}
+export const processCommand = async (client: Client, interaction: ChatInputCommandInteraction): Promise<void> => {
+  await interaction.deferReply({ ephemeral: true });
+  const command = Commands.find(c => c.name === interaction.commandName);
+  if (!command) {
+    await interaction.editReply('Bu komut artık kullanılmıyor. /embed-settings veya /reaction-settings kullan.');
+    return;
+  }
+  if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {
+    await interaction.editReply('Bu işlem için Sunucuyu Yönet yetkisi gerekli.');
+    return;
+  }
+  try {
+    await command.run(client, interaction);
+  } catch (error) {
+    console.error('Command failed:', interaction.commandName, error);
+    await interaction.editReply('Komut işlenirken hata oluştu. Bot günlüklerini kontrol et.');
+  }
 };

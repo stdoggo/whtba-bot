@@ -20,15 +20,24 @@ On new human-authored messages, the bot replies without pinging the sender, trie
 
 ## Commands
 
-All slash commands require Manage Server permission:
-- `/setupserver`: register server and configure like/dislike emojis, supported embed reactions and `react-to-bots:true/false` (default `false`). When enabled, it covers other bots' media posts **and WHTBA's own converted-link replies**.
-- `/select-channels`: manage channels where 👍/👎 reactions are added. This does not affect the external-link preview handler.
-- `/setupchannel`: adjust channel moderation and embed-reaction preferences.
-- `/settings`: configure link preview enable/disable and its optional channel allowlist; `action:enabled enabled:false` disables fixes, `action:channel-add channel:#channel` starts/extends the allowlist, `action:channel-remove channel:#channel` removes a selection, and `action:channel-all` restores all channels.
-- `/help`: view basic usage.
+Only **two top-level slash commands** are registered. Both require **Manage Server** permissions; all settings replies are ephemeral.
 
-The old video/audio converter, quick-action buttons, media uploads and soundboard integration have been removed. Former context commands **Convert media** and **Upload to soundboard** are unregistered by running `npm run updatecommands`. No media download or local conversion utilities are needed.
+### /embed-settings
 
+- /embed-settings preview — turn automatic social link previews on/off, add/remove allowed preview channels, or allow all channels.
+- /embed-settings moderation — decide whether messages without recognized media are deleted in a selected channel.
+- /embed-settings show — display current preview and channel moderation configuration.
+
+### /reaction-settings
+
+- /reaction-settings server — set like/dislike emojis, bot-post reactions (including WHTBA converted links), and reactions on embedded media; initializes a fresh server if necessary.
+- /reaction-settings channel — override the server embed-reaction policy for one channel.
+- /reaction-settings channels — open the interactive multi-select picker to add, remove or clear emoji-reaction channels.
+- /reaction-settings show — show current server emojis, bot-reaction toggle and selected reaction channels.
+
+**Migration:** The previous /help, /setupserver, /setupchannel, /settings and /select-channels slash commands are retired. Run npm run updatecommands to replace all registered guild commands with only the two new top-level commands. Existing PostgreSQL settings and channel selections are reused with no schema migration or reset.
+
+No media download, conversion or soundboard components are installed; yt-dlp and FFmpeg are not required.
 ## Setup on Windows
 
 Requirements: Node.js/npm, PostgreSQL and an existing `.env` with `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, `DATABASE_URL`.

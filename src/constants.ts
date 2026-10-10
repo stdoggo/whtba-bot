@@ -34,21 +34,8 @@ export interface Command extends ChatInputApplicationCommandData {
     run: (client: Client, interaction: CommandInteraction) => void;
 }
 
-import { help } from './commands/help';
-import { setupserver } from './commands/setupserver';
-import { setupchannel } from './commands/setupchannel';
-import { selectChannels } from './commands/select-channels';
-import { settingsCommand } from './commands/settings';
-export const Commands: Command[] = [help, setupserver, setupchannel, selectChannels, settingsCommand];
+import { embedSettings } from './commands/embed-settings';
+import { reactionSettings } from './commands/reaction-settings';
+export const Commands: Command[] = [embedSettings, reactionSettings];
 
-export const NOT_REGISTERED_MESSAGE = 'Server is not registered ❌\nPlease run `/setupserver` to register this server';
-export const HELP_MESSAGE = 'WHTBA bot — özel sunucu medya beğeni botu.' +
-'\n`/setupserver` Sunucu ayarlarını oluşturur veya günceller.' +
-'\n`/setupserver like-reaction:👍 dislike-reaction:👎` Tepki emojilerini belirler.' +
-'\n`/setupserver allow-embed-reactions:Allow all` Bağlantı önizlemelerine de tepki ekler.' +
-'\n`/setupserver react-to-bots:true` Diğer botların medyasına ve WHTBA link yanıtlarına emoji ekler.' +
-'\n`/setupchannel` Bu kanalın medya ve yazı kurallarını düzenler.' +
-'\n`/select-channels` Emoji eklenecek kanalları çoklu seçimle yönetir.' +
-'\n`/settings` Medya özelliklerini ve kanalları yönetir.' +
-'\n`/setupchannel forbid-text:Messages must contain content` Medyasız mesajları siler.' +
-'\nAyarları değiştirmek için Sunucuyu Yönet yetkisi gerekir. Yardım için sunucu yöneticisine başvur.';
+export const NOT_REGISTERED_MESSAGE = 'Sunucu henüz kayıtlı değil. /reaction-settings server komutunu kullan.';

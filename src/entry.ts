@@ -9,7 +9,7 @@ import { handleAutomaticMedia } from './media/automatic';
 import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
-import { isSelectChannelsComponent, processSelectChannelsComponent } from './commands/select-channels';
+import { isSelectChannelsComponent, processSelectChannelsComponent } from './commands/reaction-channels-ui';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { createPrismaRedisCache } from 'prisma-redis-middleware';
 
