@@ -20,7 +20,7 @@ test('event routing processes only the configured private server, without loggin
   try {
     for (const id of [null, '123456789012345679', guild]) {
       discordClient.emit(Events.MessageCreate, { guildId: id });
-      discordClient.emit(Events.InteractionCreate, { guildId: id, isCommand: () => true });
+      discordClient.emit(Events.InteractionCreate, { guildId: id, isChatInputCommand: () => true });
       discordClient.emit(Events.MessageReactionAdd, { message: { guildId: id } }, {});
       discordClient.emit(Events.MessageReactionRemove, { message: { guildId: id } }, {});
     }
