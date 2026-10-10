@@ -70,27 +70,37 @@ export const findMediaLinks = (content: string): MediaLink[] => {
 	}
 	return links;
 };
-// Display only a compact linked platform name (or TikTok ID).
-// Media is never downloaded or uploaded by this bot.
-const mediaLabel = (link: MediaLink): string => {
-	if (link.platform === 'tiktok') {
-		try {
-			const url = new URL(link.original);
-			const segments = url.pathname.split('/').filter(Boolean);
-			const video = segments.findIndex(s => s.toLowerCase() === 'video');
-			const id = video >= 0 ? segments[video + 1] :
-				/^(vm|vt)\.tiktok\.com$/i.test(url.hostname) ? segments[0] : undefined;
-			if (id && /^[\w-]{3,32}$/.test(id)) return 'tiktok-' + id + '.mp4';
-		} catch { /* Fall through. */ }
-		return 'tiktok';
-	}
-	const names: Record<Exclude<SupportedSite, 'tiktok'>, string> = {
-		x: 'twitter', reddit: 'reddit', instagram: 'instagram',
-		bluesky: 'bluesky', youtube: 'youtube', twitch: 'twitch',
-		facebook: 'facebook', vimeo: 'vimeo',
-		streamable: 'streamable', dailymotion: 'dailymotion',
-	};
-	return names[link.platform];
+// The source URL is used to derive a compact, meaningful post/clip identifier.
+export const mediaLabel = (link: MediaLink): string => {
+  const platform = link.platform === 'x' ? 'twitter' : link.platform;
+  const url = new URL(link.original);
+  const segments = url.pathname.split('/').filter(Boolean);
+  const after = (...keys: string[]): string | undefined => {
+    const index = segments.findIndex((part, i) => i + 1 < segments.length && keys.includes(part.toLowerCase()));
+    return index < 0 ? undefined : segments[index + 1];
+  };
+  let id: string | undefined;
+  switch (link.platform) {
+    case 'x': id = after('status'); break;
+    case 'reddit': id = after('comments'); break;
+    case 'tiktok': id = after('video') ?? (/^(vm|vt)\.tiktok\.com$/i.test(url.hostname) ? segments[0] : undefined); break;
+    case 'instagram': id = after('reel','reels','p','tv'); break;
+    case 'bluesky': id = after('post'); break;
+    case 'youtube': id = after('shorts'); break;
+    case 'twitch': id = url.hostname === 'clips.twitch.tv' ? segments[0] : after('clip'); break;
+    case 'facebook': id = after('reel','videos','r','v') ?? url.searchParams.get('v') ?? undefined;
+      if (!id && url.hostname === 'fb.watch') id = segments[0]; break;
+    case 'vimeo': id = after('video') ?? segments[0]; break;
+    case 'streamable': id = segments[0]; break;
+    case 'dailymotion': id = after('video') ?? (url.hostname === 'dai.ly' ? segments[0] : undefined); break;
+  }
+  // Never inject unsafe punctuation or Markdown into the visible label.
+  if (!id || !/^[A-Za-z0-9_-]{2,64}$/.test(id)) return platform;
+  return platform + '-' + id + (link.platform === 'tiktok' ? '.mp4' : '');
 };
-export const proxyEmbedLine = (link: MediaLink): string =>
-	'-# [' + mediaLabel(link) + '](' + link.fixed + ')';
+
+// Inline-code styling inside a masked link; the bot does not upload a media file.
+export const proxyEmbedLine = (link: MediaLink): string => {
+  const tick = String.fromCharCode(96);
+  return '-# [' + tick + mediaLabel(link) + tick + '](' + link.fixed + ')';
+};
