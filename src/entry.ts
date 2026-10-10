@@ -10,40 +10,11 @@ import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
 import { isSelectChannelsComponent, processSelectChannelsComponent } from './commands/reaction-channels-ui';
-import { Prisma, PrismaClient } from '@prisma/client';
-import { createPrismaRedisCache } from 'prisma-redis-middleware';
+import { PrismaClient } from '@prisma/client';
 
-// Postgres connection
+// Local SQLite database. Prisma reads DATABASE_URL from .env.
+// No PostgreSQL server, Redis instance or external database service is used.
 export const prismaClient = new PrismaClient();
-
-// https://github.com/Asjas/prisma-redis-middleware
-const cacheMiddleware: Prisma.Middleware = createPrismaRedisCache({
-	models: [
-		// Time is in seconds
-		{ model: 'WorldUser', cacheTime: 60 },
-		{ model: 'LocalUser', cacheTime: 60 },
-		{ model: 'World', cacheTime: 9999 },
-		{ model: 'Server', cacheTime: 9999 },
-		{ model: 'ServerSettings', cacheTime: 9999 },
-		{ model: 'ChannelSettings', cacheTime: 9999 },
-	],
-	storage: { type: 'memory', options: { size: 2048, invalidation: true } },
-	cacheTime: 300,
-	excludeModels: ['Message'],
-	excludeMethods: [],
-	// onHit: (key) => {
-	// 	console.log('hit', key);
-	// },
-	// onMiss: (key) => {
-	// 	console.log('miss', key);
-	// },
-	// onError: (key) => {
-	// 	console.log('error', key);
-	// },
-});
-
-
-prismaClient.$use(cacheMiddleware);
 
 // See https://discord.com/developers/docs/topics/gateway#list-of-intents
 export const discordClient = new Client({

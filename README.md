@@ -35,23 +35,53 @@ Only **two top-level slash commands** are registered. Both require **Manage Serv
 - /reaction-settings channels — open the interactive multi-select picker to add, remove or clear emoji-reaction channels.
 - /reaction-settings show — show current server emojis, bot-reaction toggle and selected reaction channels.
 
-**Migration:** The previous /help, /setupserver, /setupchannel, /settings and /select-channels slash commands are retired. Run npm run updatecommands to replace all registered guild commands with only the two new top-level commands. Existing PostgreSQL settings and channel selections are reused with no schema migration or reset.
+**Migration:** The previous /help, /setupserver, /setupchannel, /settings and /select-channels slash commands are retired. Run npm run updatecommands to replace all registered guild commands with only the two new top-level commands. The current deployment starts with a new SQLite database; older PostgreSQL data is not migrated.
 
 No media download, conversion or soundboard components are installed; yt-dlp and FFmpeg are not required.
-## Setup on Windows
+## Run locally on Windows (no PostgreSQL)
 
-Requirements: Node.js/npm, PostgreSQL and an existing `.env` with `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, `DATABASE_URL`.
+**Requirements:** Node.js 20 or 22, npm, and your existing Discord credentials. SQLite is bundled with Prisma, so **no PostgreSQL, Redis, SQL app or database account is necessary**.
+
+The database will be stored at `D:\\whtba-bot\\prisma\\whtba.db`. This file is created automatically and is ignored by Git.
+
+1. Stop the running bot (Ctrl+C). Open CMD in your existing project folder.
+2. Update code and dependencies:
 
 ```bat
-cd /d D:\whtba-bot
+cd /d D:\\whtba-bot
 git pull origin main
 npm install
+```
+
+3. In `.env`, **keep your three existing Discord values unchanged** and replace only the old PostgreSQL `DATABASE_URL` with:
+
+```dotenv
+DATABASE_URL="file:./whtba.db"
+```
+
+4. Create a **brand-new SQLite database** and regenerate the Prisma client:
+
+```bat
 npx prisma generate
+npm run db:setup
+```
+
+5. Validate, re-register the two admin slash commands (only needed when changing commands), then start the bot:
+
+```bat
 npm run build
 npm test
 npm run updatecommands
 npm start
 ```
+
+6. In Discord, use `/reaction-settings server` and `/reaction-settings channels` to recreate your emoji preferences; `/embed-settings preview` controls link fixing. Since this is a fresh database, previous reaction counts and channel selections are intentionally **not** imported.
+
+**Backups:** Stop the bot and copy `prisma\\whtba.db` somewhere safe. Never commit, upload or share the database file or `.env`. To reset later, stop the bot, delete *only* `prisma\\whtba.db` and run `npm run db:setup` again. This is destructive to stored data.
+
+**Database path detail:** Prisma resolves `file:./whtba.db` relative to `prisma/schema.prisma`, not the CMD working directory.
+
+**Docker:** The image initializes SQLite on startup at `/app/data/whtba.db`; mount a persistent Docker volume at `/app/data` to retain its data between containers.
 
 **Discord permissions**: View Channel, Read Message History, Send Messages, Embed Links, and Manage Messages (for suppressing the original embed). Enable the Message Content Intent. Attach Files and Create Expressions are not required by these previews.
 
@@ -59,9 +89,9 @@ npm start
 
 - Media is neither downloaded nor re-encoded. The bot only posts URLs; Discord and external embed providers handle preview generation.
 - Proxy uptime and playback support vary, and some videos may only appear as simple links.
-- Link fixing uses its own optional channel allowlist, while reaction controls use `/select-channels`.
-- `/setupserver react-to-bots:true` adds reactions to eligible attachments/embeds from **other bots** and to **WHTBA's own converted-link replies**. Other WHTBA messages stay excluded. The toggle defaults to disabled. `/select-channels` limits these reactions, but link fixing itself remains independent. Human votes on eligible bot posts and WHTBA's converted replies are counted; votes cast by other bots remain ignored.
-- PostgreSQL stores server/channel settings and reaction counters. Old converter setting fields in the server JSON are ignored and cleaned when `/settings` saves updated preferences.
+- Link fixing uses its own optional channel allowlist, while reaction channels are managed by `/reaction-settings channels`.
+- `/reaction-settings server react-to-bots:true` adds reactions to eligible attachments/embeds from **other bots** and to **WHTBA's own converted-link replies**. Other WHTBA messages stay excluded. The toggle defaults to disabled. `/reaction-settings channels` limits these reactions, but link fixing itself remains independent. Human votes on eligible bot posts and WHTBA's converted replies are counted; votes cast by other bots remain ignored.
+- SQLite stores server/channel settings and reaction counters in the local prisma/whtba.db file. Old PostgreSQL values are not imported.
 - Events are processed only while the bot is running; past missed messages are not retroactively scanned.
 - Bot/user/message IDs stored by the original reaction tracking system remain unchanged.
 

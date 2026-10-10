@@ -1,19 +1,38 @@
-name: TypeScript and tests
+name: SQLite setup and tests
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+permissions:
+  contents: write
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci-whtba.db
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
+      # Update lockfile once for the Prisma 6 / SQLite migration, then keep it in sync.
+      - run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
+      - run: npx prisma validate
       - run: npx prisma generate
+      - run: npm run db:setup
+      - run: npm run db:smoke
       - run: npm run build
       - run: npm test
+      - name: Commit refreshed package-lock.json
+        if: github.event_name == 'push'
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: sync lockfile for local SQLite and Prisma 6"
+            git push origin HEAD:main
+          fi

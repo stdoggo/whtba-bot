@@ -5,27 +5,28 @@
   "main": "src/entry.ts",
   "scripts": {
     "lint": "eslint --ext .js --ext .ts",
-    "refreshdb": "npx prisma migrate dev --name init",
+    "refreshdb": "prisma db push",
     "start": "tsc && cross-env NODE_ENV=production node build/entry.js",
     "start:dev": "nodemon --exec ./node_modules/.bin/babel-node src/entry.ts --extensions \".ts\"",
     "startdocker": "npm run start",
     "test": "node --test tests/*.test.cjs",
     "updatecommands": "ts-node src/scripts/register-commands.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "db:setup": "prisma db push",
+    "db:smoke": "node scripts/sqlite-smoke.cjs"
   },
   "keywords": [],
   "license": "GPL-3.0-only",
   "dependencies": {
-    "@prisma/client": "^5.2.0",
+    "@prisma/client": "6.19.0",
     "cross-env": "^7.0.3",
     "discord.js": "^14.13.0",
     "dotenv": "^16.3.1",
-    "prisma": "^5.2.0",
-    "prisma-redis-middleware": "4.8.0"
+    "prisma": "6.19.0"
   },
   "engines": {
-    "npm": "9.8.1",
-    "node": "18.17.1"
+    "node": ">=20.9.0 <23",
+    "npm": ">=10"
   },
   "devDependencies": {
     "@babel/cli": "^7.22.10",
