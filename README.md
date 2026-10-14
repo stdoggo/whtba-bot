@@ -80,8 +80,6 @@ SQLite runs directly within the application. No external database server or data
 - A Discord application and bot token
 - A Discord server with administrator access for initial configuration
 
-Use a modern supported Windows or Linux operating system. Legacy Windows versions such as Windows Server 2012 R2 are not supported by the required Node.js runtime.
-
 ## Installation
 
 ### 1. Clone the repository
