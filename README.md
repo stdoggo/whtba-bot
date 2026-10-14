@@ -1,105 +1,348 @@
-# WHTBA bot
+# WHTBA Bot
 
-Private Discord bot configured for one server using `DISCORD_GUILD_ID`. Adds custom like/dislike reactions to selected media channels and fixes broken social previews with **external embed links only**.
+WHTBA is a self-hosted Discord bot designed for a single server. It provides automatic social media link previews, customizable emoji reactions, channel-specific settings, and local data storage.
 
-## Supported links
+## Features
 
-| Site | Strategy |
-| --- | --- |
-| X / Twitter | `fxtwitter.com` |
-| Reddit | `vxreddit.com` |
-| TikTok, including short `vm` and `vt` links | `tnktok.com` / `vm.tnktok.com` / `vt.tnktok.com` |
-| Instagram Reels/posts | `eeinstagram.com` |
-| Bluesky | `bskye.app` |
-| Twitch clips | `fxtwitch.seria.moe` |
-| Facebook videos/Reels | `facebed.seria.moe` for full links |
-| YouTube Shorts | Standard YouTube `watch?v=` playable link |
-| Vimeo, Streamable, Dailymotion, `fb.watch` | Original/native URL (if the platform supplies a Discord preview) |
+### Social Media Embeds
 
-On new human-authored messages, the bot replies without pinging the sender, tries to hide the original preview, and displays **one normal-size linked inline-code label** (without Discord's small-text `-#` prefix): `tiktok-<id>.mp4` for TikTok or `twitter-<post-id>`, `facebook-<post-id>`, `instagram-<post-id>`, `reddit-<post-id>`, etc. for other sites. If the URL does not contain a recognizable ID, only the platform name is used. There is no `View original` link or raw URL in the reply. The clickable label targets the external embed service; the bot never uploads an MP4. Discord may not generate a playable preview for masked Markdown links or reliably combine inline-code styling with clickable links, so verify this visually in the live server. Up to three URLs per message are supported. Link fixing defaults to **all channels** independently of emoji reaction channel selections.
+WHTBA automatically detects supported social media URLs and replies with an alternative link designed to improve Discord's media previews.
 
-## Commands
+Supported platforms:
 
-Only **two top-level slash commands** are registered. Both require **Manage Server** permissions; all settings replies are ephemeral.
+| Platform | Link provider |
+|---|---|
+| X / Twitter | fxtwitter.com |
+| Reddit | vxreddit.com |
+| TikTok | tnktok.com |
+| Instagram | eeinstagram.com |
+| Bluesky | bskye.app |
+| Twitch | fxtwitch.seria.moe |
+| Facebook | facebed.seria.moe |
+| YouTube Shorts | Native YouTube player |
+| Vimeo | Native URL |
+| Streamable | Native URL |
+| Dailymotion | Native URL |
 
-### /embed-settings
+**Embed behavior:**
 
-- /embed-settings preview — turn automatic social link previews on/off, add/remove allowed preview channels, or allow all channels.
-- /embed-settings moderation — decide whether messages without recognized media are deleted in a selected channel.
-- /embed-settings show — display current preview and channel moderation configuration.
+- Automatically detects up to three supported links per message.
+- Generates compact labels using the platform name and post identifier.
+- Uses inline-code styling for link labels.
+- Attempts to suppress the original Discord embed.
+- Does not mention the original message author.
+- Supports channel-specific preview permissions.
+- Does not download, upload, or re-encode media.
 
-### /reaction-settings
+Example labels:
 
-- /reaction-settings server — set like/dislike emojis, bot-post reactions (including WHTBA converted links), and reactions on embedded media; initializes a fresh server if necessary.
-- /reaction-settings channel — override the server embed-reaction policy for one channel.
-- /reaction-settings channels — open the interactive multi-select picker to add, remove or clear emoji-reaction channels.
-- /reaction-settings show — show current server emojis, bot-reaction toggle and selected reaction channels.
+- `twitter-1234567890`
+- `instagram-Cx12Ab3`
+- `tiktok-7689983778025901343.mp4`
+- `reddit-abcd12`
 
-**Migration:** The previous /help, /setupserver, /setupchannel, /settings and /select-channels slash commands are retired. Run npm run updatecommands to replace all registered guild commands with only the two new top-level commands. The current deployment starts with a new SQLite database; older PostgreSQL data is not migrated.
+Media previews are handled by Discord and external services. Playback availability may vary depending on the provider and Discord's link rendering behavior.
 
-No media download, conversion or soundboard components are installed; yt-dlp and FFmpeg are not required.
-## Run locally on Windows (no PostgreSQL)
+### Emoji Reactions
 
-**Requirements:** Node.js 20 or 22, npm, and your existing Discord credentials. SQLite is bundled with Prisma, so **no PostgreSQL, Redis, SQL app or database account is necessary**.
+WHTBA can automatically add customizable like and dislike reactions to qualifying messages.
 
-The database will be stored at `D:\\whtba-bot\\prisma\\whtba.db`. This file is created automatically and is ignored by Git.
+Features include:
 
-1. Stop the running bot (Ctrl+C). Open CMD in your existing project folder.
-2. Update code and dependencies:
+- Customizable like and dislike emojis.
+- Support for Unicode and server-specific emojis.
+- Reactions on supported media attachments and embeds.
+- Optional reactions on messages from other bots.
+- Optional reactions on WHTBA's own converted-link replies.
+- Server-wide and channel-specific embed reaction rules.
+- Multiple reaction channels managed through an interactive selector.
+- Reaction tracking and persistent statistics.
 
-```bat
-cd /d D:\\whtba-bot
-git pull origin main
-npm install
+Emoji reactions and link previews use independent channel configurations.
+
+### Local Database
+
+WHTBA uses SQLite through Prisma.
+
+All application data is stored locally in a single database file:
+
+`prisma/whtba.db`
+
+This includes server settings, channel configurations, user records, and reaction statistics.
+
+SQLite runs directly within the application. No external database server or database management software is required.
+
+## Requirements
+
+- Node.js 20 or 22
+- npm
+- Git
+- A Discord application and bot token
+- A Discord server with administrator access for initial configuration
+
+Use a modern supported Windows or Linux operating system. Legacy Windows versions such as Windows Server 2012 R2 are not supported by the required Node.js runtime.
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/stdoggo/whtba-bot.git
+cd whtba-bot
 ```
 
-3. In `.env`, **keep your three existing Discord values unchanged** and replace only the old PostgreSQL `DATABASE_URL` with:
+### 2. Install dependencies
+
+```bash
+npm ci
+```
+
+### 3. Configure environment variables
+
+Create a `.env` file in the project root.
+
+You can use `.env.example` as a template.
 
 ```dotenv
+DISCORD_BOT_TOKEN="YOUR_BOT_TOKEN"
+DISCORD_APPLICATION_ID="YOUR_APPLICATION_ID"
+DISCORD_GUILD_ID="YOUR_SERVER_ID"
 DATABASE_URL="file:./whtba.db"
 ```
 
-4. Create a **brand-new SQLite database** and regenerate the Prisma client:
+| Variable | Description |
+|---|---|
+| `DISCORD_BOT_TOKEN` | Discord bot authentication token |
+| `DISCORD_APPLICATION_ID` | Discord application ID |
+| `DISCORD_GUILD_ID` | ID of the Discord server where the bot operates |
+| `DATABASE_URL` | Local SQLite database connection |
 
-```bat
+Keep your bot token private. Never commit the `.env` file.
+
+### 4. Initialize the database
+
+Generate the Prisma Client:
+
+```bash
 npx prisma generate
+```
+
+Create the SQLite database and required tables:
+
+```bash
 npm run db:setup
 ```
 
-5. Validate, re-register the two admin slash commands (only needed when changing commands), then start the bot:
+The database will be created at `prisma/whtba.db`.
 
-```bat
-npm run build
-npm test
+### 5. Register Discord commands
+
+```bash
 npm run updatecommands
+```
+
+This registers the bot's slash commands in the configured Discord server.
+
+### 6. Start the bot
+
+```bash
 npm start
 ```
 
-6. In Discord, use `/reaction-settings server` and `/reaction-settings channels` to recreate your emoji preferences; `/embed-settings preview` controls link fixing. Since this is a fresh database, previous reaction counts and channel selections are intentionally **not** imported.
+The bot compiles its TypeScript source and connects to Discord.
 
-**Backups:** Stop the bot and copy `prisma\\whtba.db` somewhere safe. Never commit, upload or share the database file or `.env`. To reset later, stop the bot, delete *only* `prisma\\whtba.db` and run `npm run db:setup` again. This is destructive to stored data.
+Keep the process running for the bot to remain online.
 
-**Database path detail:** Prisma resolves `file:./whtba.db` relative to `prisma/schema.prisma`, not the CMD working directory.
+## Discord Commands
 
-**Docker:** The image initializes SQLite on startup at `/app/data/whtba.db`; mount a persistent Docker volume at `/app/data` to retain its data between containers.
+WHTBA provides two top-level slash commands. Both require the **Manage Server** permission.
 
-**Discord permissions**: View Channel, Read Message History, Send Messages, Embed Links, and Manage Messages (for suppressing the original embed). Enable the Message Content Intent. Attach Files and Create Expressions are not required by these previews.
+Configuration responses are visible only to the administrator executing the command.
 
-## Notes
+### `/embed-settings`
 
-- Media is neither downloaded nor re-encoded. The bot only posts URLs; Discord and external embed providers handle preview generation.
-- Proxy uptime and playback support vary, and some videos may only appear as simple links.
-- Link fixing uses its own optional channel allowlist, while reaction channels are managed by `/reaction-settings channels`.
-- `/reaction-settings server react-to-bots:true` adds reactions to eligible attachments/embeds from **other bots** and to **WHTBA's own converted-link replies**. Other WHTBA messages stay excluded. The toggle defaults to disabled. `/reaction-settings channels` limits these reactions, but link fixing itself remains independent. Human votes on eligible bot posts and WHTBA's converted replies are counted; votes cast by other bots remain ignored.
-- SQLite stores server/channel settings and reaction counters in the local prisma/whtba.db file. Old PostgreSQL values are not imported.
-- Events are processed only while the bot is running; past missed messages are not retroactively scanned.
-- Bot/user/message IDs stored by the original reaction tracking system remain unchanged.
+Controls automatic link previews and channel media rules.
+
+| Subcommand | Description |
+|---|---|
+| `preview` | Configure link previews and allowed channels |
+| `moderation` | Configure media requirements for messages in a channel |
+| `show` | Display the current embed configuration |
+
+**Preview settings**
+
+The `preview` subcommand supports:
+
+- `show` — display current settings.
+- `enabled` — enable or disable automatic link previews.
+- `channel-add` — add a channel to the preview allowlist.
+- `channel-remove` — remove a channel from the allowlist.
+- `channel-all` — allow previews in every channel.
+
+**Moderation settings**
+
+The `moderation` subcommand controls whether a channel allows ordinary text messages or requires recognized media content.
+
+### `/reaction-settings`
+
+Controls emoji reactions and their channel permissions.
+
+| Subcommand | Description |
+|---|---|
+| `server` | Configure emojis and server-wide reaction behavior |
+| `channel` | Configure embed reaction rules for a channel |
+| `channels` | Select where automatic emoji reactions are added |
+| `show` | Display the current reaction configuration |
+
+**Server settings**
+
+Configure:
+
+- Like reaction emoji.
+- Dislike reaction emoji.
+- Reactions on bot-authored messages.
+- Reaction rules for embedded content.
+
+**Channel selection**
+
+The `channels` subcommand opens an interactive Discord channel selector.
+
+Administrators can add channels, remove channels, or clear all selected channels. The selector supports batches of up to 25 channels.
+
+By default, reaction channel filtering is unrestricted until a selection is configured. An explicitly empty selection disables automatic reactions.
+
+## Discord Permissions
+
+The bot requires appropriate permissions in the configured server.
+
+Recommended permissions:
+
+- View Channels
+- Read Message History
+- Send Messages
+- Embed Links
+- Add Reactions
+- Manage Messages
+
+The **Manage Messages** permission is used to suppress original link embeds and for configured message moderation.
+
+Enable the following privileged intent in the Discord Developer Portal:
+
+**Bot → Privileged Gateway Intents → Message Content Intent**
+
+The bot also uses guild, message, and message reaction gateway intents.
+
+## Database Management
+
+### Backup
+
+Stop the bot before copying the SQLite database.
+
+Back up the following file:
+
+`prisma/whtba.db`
+
+Store the backup in a safe location.
+
+### Restore
+
+Stop the bot and replace `prisma/whtba.db` with a valid backup created using a compatible database schema.
+
+Start the bot normally afterward.
+
+### Database initialization
+
+```bash
+npm run db:setup
+```
+
+This synchronizes the local database schema with the Prisma schema.
+
+### Database inspection
+
+```bash
+npx prisma studio
+```
+
+Prisma Studio provides an interface for inspecting database records.
+
+Do not expose the local database or its contents publicly.
 
 ## Development
 
-```sh
+Project structure:
+
+```text
+whtba-bot/
+├── prisma/
+│   └── schema.prisma
+├── scripts/
+│   └── sqlite-smoke.cjs
+├── src/
+│   ├── commands/
+│   ├── handlers/
+│   ├── media/
+│   ├── queries/
+│   ├── scripts/
+│   ├── settings/
+│   └── entry.ts
+├── tests/
+├── .env.example
+├── package.json
+└── tsconfig.json
+```
+
+### Build
+
+```bash
 npm run build
+```
+
+### Run tests
+
+```bash
 npm test
 ```
 
-Project files are organized under `src/`; database models are defined in `prisma/schema.prisma`. License: GPL-3.0-only (see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+### Generate Prisma Client
+
+```bash
+npx prisma generate
+```
+
+### Register slash commands
+
+```bash
+npm run updatecommands
+```
+
+### Start the application
+
+```bash
+npm start
+```
+
+## Deployment
+
+WHTBA can run on a Windows or Linux machine that supports the required Node.js and Prisma versions.
+
+The bot requires an active internet connection to communicate with Discord and the external embed providers.
+
+For continuous operation, the Node.js process must remain running. A process manager or operating-system service can be used to restart the bot when necessary.
+
+When using Docker, store the SQLite database in a persistent volume to prevent data loss when containers are recreated.
+
+## Security
+
+- Never share or commit your Discord bot token.
+- Keep `.env` and SQLite database files private.
+- Use a dedicated Discord bot account.
+- Grant only the Discord permissions needed by your configuration.
+- Back up the database regularly.
+- Keep dependencies updated and review changes before deployment.
+
+## License
+
+Licensed under **GPL-3.0-only**.
+
+See `LICENSE` for details.
