@@ -150,6 +150,9 @@ test('post IDs appear after the correct site name on every supported platform', 
   const cases = [
     ['https://x.com/u/status/1234567890', 'twitter-1234567890'],
     ['https://reddit.com/r/example/comments/abcd12/post', 'reddit-abcd12'],
+    ['https://www.reddit.com/r/GamingLeaksAndRumours/s/JzzRODtyrd', 'reddit-JzzRODtyrd'],
+    ['https://reddit.com/r/Example/s/AaBb12cdEF/', 'reddit-AaBb12cdEF'],
+    ['https://reddit.com/r/Example/comments/abcd12/post?s=unrelated', 'reddit-abcd12'],
     ['https://instagram.com/reel/Cx12Ab3/', 'instagram-Cx12Ab3'],
     ['https://bsky.app/profile/person.bsky.social/post/3mka2j', 'bluesky-3mka2j'],
     ['https://youtube.com/shorts/AbCdEfGh123', 'youtube-AbCdEfGh123'],
@@ -173,4 +176,14 @@ test('post IDs appear after the correct site name on every supported platform', 
 test('URLs with no identifiable post number use only the platform name', () => {
   const link = mediaLinkFromUrl('https://x.com/someuser');
   assert.equal(proxyEmbedLine(link), '[`twitter`](https://fxtwitter.com/someuser)');
+});
+
+test('Reddit short share links use the share code in the clickable label', () => {
+  const url = 'https://www.reddit.com/r/GamingLeaksAndRumours/s/JzzRODtyrd';
+  const link = mediaLinkFromUrl(url);
+  assert.ok(link);
+  assert.equal(link.platform, 'reddit');
+  assert.equal(link.fixed, 'https://vxreddit.com/r/GamingLeaksAndRumours/s/JzzRODtyrd');
+  assert.equal(proxyEmbedLine(link),
+    '[`reddit-JzzRODtyrd`](https://vxreddit.com/r/GamingLeaksAndRumours/s/JzzRODtyrd)');
 });

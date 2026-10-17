@@ -82,7 +82,7 @@ export const mediaLabel = (link: MediaLink): string => {
   let id: string | undefined;
   switch (link.platform) {
     case 'x': id = after('status'); break;
-    case 'reddit': id = after('comments'); break;
+    case 'reddit': id = after('comments') ?? after('s'); break;
     case 'tiktok': id = after('video') ?? (/^(vm|vt)\.tiktok\.com$/i.test(url.hostname) ? segments[0] : undefined); break;
     case 'instagram': id = after('reel','reels','p','tv'); break;
     case 'bluesky': id = after('post'); break;
