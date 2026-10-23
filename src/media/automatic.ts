@@ -3,7 +3,7 @@ import { getServerSettings } from '../queries/get-server-settings';
 import { mediaHelperSettings, mediaEnabledInChannel } from './settings';
 import { findMediaLinks, MediaLink, proxyEmbedLine } from './sites';
 import { isReactionChannelAllowed } from '../settings/reaction-channels';
-import { defaultServerSettings, ServerSettings } from '../settings/configure';
+import { ServerSettings } from '../settings/configure';
 
 // Do not download or re-encode media. Discord unfurls the third-party URLs.
 export type FixedMediaReplyHandler = (reply: Message, settings: ServerSettings) => Promise<void>;
@@ -27,10 +27,10 @@ export const handleAutomaticMedia = async (
 		content: links.map(proxyEmbedLine).join('\n\n'),
 		allowedMentions: { parse: [], repliedUser: false },
 	});
-	// Converted replies always receive WHTBA's own reactions in selected reaction channels.
-	// reactToBots controls other bots, not WHTBA's own link replies.
-	if (onFixedReply && isReactionChannelAllowed(serverSettings, message.channelId)) {
-		try { await onFixedReply(reply, { ...defaultServerSettings, ...serverSettings }); }
+	// Only converted replies receive WHTBA's own reactions, never ordinary bot messages.
+	if (onFixedReply && serverSettings?.reactToBots === true &&
+		isReactionChannelAllowed(serverSettings, message.channelId)) {
+		try { await onFixedReply(reply, serverSettings); }
 		catch (error) {
 			console.error('Failed to add reactions to converted reply:', error);
 		}

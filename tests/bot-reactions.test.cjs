@@ -88,13 +88,12 @@ test('other bots receive initial reactions for qualifying media only when enable
   assert.equal(registered, 2);
 });
 
-test('own converted-link replies are eligible regardless of other-bot setting, ordinary WHTBA messages are not', () => {
+test('own converted-link replies are eligible when enabled, ordinary WHTBA messages are not', () => {
   const converted = '[`twitter-123`](https://fxtwitter.com/u/status/123)';
   const own = { id: selfId, bot: true };
   assert.equal(isFixedMediaReplyContent(converted), true);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, converted), true);
-  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: false }, converted), true);
-  assert.equal(isReactionAuthorAllowed(own, selfId, undefined, converted), true);
+  assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: false }, converted), false);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, 'Bot started'), false);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, '-# [View original](<https://x.com/u>)'), false);
   assert.equal(isReactionAuthorAllowed(own, selfId, { reactToBots: true }, ''), false);

@@ -21,7 +21,7 @@ export interface ServerSettings {
     hallOfFameChannel?: string; // If true, will send any messages that get enough likes to the hall of fame channel.
     allowEmbedReactions?: number; // See the setupserver.ts
     reactionChannelIds?: string[]; // When saved, limit auto reactions to these channels.
-    reactToBots?: boolean; // Whether other bots' media messages may receive reactions. WHTBA's converted replies always qualify.
+    reactToBots?: boolean; // Whether other bots' media messages may receive like/dislike reactions.
 }
 
 export interface ChannelSettings {

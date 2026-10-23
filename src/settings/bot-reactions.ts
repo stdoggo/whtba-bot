@@ -1,6 +1,6 @@
 import { ServerSettings } from './configure';
 
-// Our converted media replies can always be voted on; other WHTBA messages stay excluded.
+// Only our own converted Media-Helper replies may be voted on; other WHTBA messages stay excluded.
 export const isFixedMediaReplyContent = (content: string | null | undefined): boolean => {
   const text = content ?? '';
   // Normal-size links and historical small-text links remain eligible for votes.
@@ -33,7 +33,7 @@ export const isReactionAuthorAllowed = (
 ): boolean => {
 	if (!author?.id) return false;
 	if (ownBotId && author.id === ownBotId) {
-		return isFixedMediaReplyContent(content);
+		return settings?.reactToBots === true && isFixedMediaReplyContent(content);
 	}
 	return !author.bot || settings?.reactToBots === true;
 };
