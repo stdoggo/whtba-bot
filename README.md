@@ -53,7 +53,7 @@ Features include:
 - Support for Unicode and server-specific emojis.
 - Reactions on supported media attachments and embeds.
 - Optional reactions on messages from other bots.
-- Optional reactions on WHTBA's own converted-link replies.
+- Automatic reactions on WHTBA's own converted-link replies in configured reaction channels, independently of the other-bot toggle.
 - Server-wide and channel-specific embed reaction rules.
 - Multiple reaction channels managed through an interactive selector.
 - Reaction tracking and persistent statistics.
@@ -198,7 +198,7 @@ Configure:
 
 - Like reaction emoji.
 - Dislike reaction emoji.
-- Reactions on bot-authored messages.
+- Optional reactions on messages from other bots. WHTBA's own converted-link replies react automatically in selected channels.
 - Reaction rules for embedded content.
 
 **Channel selection**

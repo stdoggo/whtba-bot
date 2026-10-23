@@ -89,10 +89,10 @@ test('disabled channels, bot messages and failed replies are handled safely', as
   assert.equal(suppressed, false);
 });
 
-test('converted WHTBA reply receives reactions only with react-to-bots enabled in a selected channel', async () => {
+test('converted WHTBA reply receives reactions in selected channels independently of other-bot toggle', async () => {
   const ownChannel = '123456789012345678';
   const otherChannel = '123456789012345679';
-  const state = { reactToBots: true, reactionChannelIds: [ownChannel], mediaHelper: { enabled: true } };
+  const state = { reactToBots: false, reactionChannelIds: [ownChannel], mediaHelper: { enabled: true } };
   const prisma = { serverSettings: { findFirst: async () => ({ settings: state }) } };
   const seen = [];
   const create = (channelId) => ({
@@ -105,13 +105,34 @@ test('converted WHTBA reply receives reactions only with react-to-bots enabled i
   await handleAutomaticMedia(create(ownChannel), prisma, undefined, onFixedReply);
   assert.equal(seen.length, 1);
   assert.equal(seen[0].reply.id, '123456789012345676');
-  assert.equal(seen[0].settings.reactToBots, true);
-  state.reactToBots = false;
-  await handleAutomaticMedia(create(ownChannel), prisma, undefined, onFixedReply);
-  assert.equal(seen.length, 1);
+  assert.equal(seen[0].settings.reactToBots, false);
   state.reactToBots = true;
+  await handleAutomaticMedia(create(ownChannel), prisma, undefined, onFixedReply);
+  assert.equal(seen.length, 2);
+  state.reactToBots = false;
   await handleAutomaticMedia(create(otherChannel), prisma, undefined, onFixedReply);
-  assert.equal(seen.length, 1);
+  assert.equal(seen.length, 2);
+});
+
+test('own converted links react with default emojis even without saved server settings', async () => {
+  const reactions = [];
+  const reply = { 
+    id: '123456789012345676',
+    react: async emoji => reactions.push(emoji)
+  };
+  const message = {
+    guildId: '123456789012345677', channelId: '123456789012345678',
+    author: { bot: false }, content: 'https://reddit.com/r/test/s/AbcdEf123',
+    reply: async () => reply,
+    suppressEmbeds: async () => {}
+  };
+  const prisma = { serverSettings: { findFirst: async () => null } };
+  assert.equal(await handleAutomaticMedia(message, prisma, undefined,
+    async (sent, settings) => {
+      await sent.react(settings.likeReaction);
+      await sent.react(settings.dislikeReaction);
+    }), true);
+  assert.deepEqual(reactions, ['👍', '👎']);
 });
 
 
