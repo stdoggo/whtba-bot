@@ -9,9 +9,9 @@ const { Commands } = require('../src/constants');
 const groups = Object.fromEntries(Commands.map(command => [command.name, command]));
 const findSub = (group, name) => groups[group].options.find(item => item.name === name);
 
-test('only the three top-level slash commands are published', () => {
-  assert.deepEqual(Commands.map(command => command.name).sort(), ['embed','reaction','stats']);
-  assert.equal(Commands.every(command => command.options.every(option =>
+test('only the four top-level slash commands are published', () => {
+  assert.deepEqual(Commands.map(command => command.name).sort(), ['embed','ping','reaction','stats']);
+  assert.equal(Commands.every(command => (command.options ?? []).every(option =>
     option.type === ApplicationCommandOptionType.Subcommand)), true);
 });
 
@@ -58,7 +58,7 @@ test('stats command is open to members, settings commands stay admin-only', () =
   assert.equal(groups.stats.ephemeral(fake('sync', null)), true);
   for (const command of Commands) {
     assert.ok(command.description.length <= 100);
-    for (const sub of command.options) {
+    for (const sub of command.options ?? []) {
       assert.ok(sub.description.length <= 100, sub.name);
       for (const option of sub.options ?? []) assert.ok(option.description.length <= 100, sub.name + ' ' + option.name);
     }
@@ -101,4 +101,17 @@ test('days, leaderboard and channels share the same paginated buttons', () => {
   assert.deepEqual(stats.parseListId(legacy), {
     kind: 'days', page: 3, range: 'all', channelId: '12345678901234567890', userId: null, includeBots: true, ownerId: '98765432109876543210',
   });
+});
+
+test('ping replies publicly to everyone with the latency as inactive voters', async () => {
+  const { pingMessage, pingValue } = require('../src/commands/ping');
+  assert.equal(groups.ping.adminOnly, false);
+  assert.equal(groups.ping.ephemeral({}), false);
+  assert.equal(groups.ping.options, undefined);
+  assert.equal(pingMessage(42), 'size oy verenlerden **42** kişi inaktif');
+  assert.equal(pingValue({ ws: { ping: 41.6 } }, { createdTimestamp: 0 }), 42);
+  assert.equal(pingValue({ ws: { ping: -1 } }, { createdTimestamp: 1000 }, 1250), 250, 'falls back to round trip before the first heartbeat');
+  let reply;
+  await groups.ping.run({ ws: { ping: 87 } }, { createdTimestamp: Date.now(), editReply: async payload => { reply = payload; } });
+  assert.equal(reply.content, 'size oy verenlerden **87** kişi inaktif');
 });

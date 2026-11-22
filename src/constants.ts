@@ -41,6 +41,7 @@ export interface Command extends ChatInputApplicationCommandData {
 import { embedSettings } from './commands/embed';
 import { reactionSettings } from './commands/reaction';
 import { stats } from './commands/stats';
-export const Commands: Command[] = [embedSettings, reactionSettings, stats];
+import { ping } from './commands/ping';
+export const Commands: Command[] = [embedSettings, reactionSettings, stats, ping];
 
 export const NOT_REGISTERED_MESSAGE = 'Sunucu henüz kayıtlı değil. /reaction server komutunu kullan.';

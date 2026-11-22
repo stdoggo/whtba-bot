@@ -187,7 +187,7 @@ Keep the process running for the bot to remain online.
 
 ## Discord Commands
 
-WHTBA provides three top-level slash commands. `/embed` and `/reaction` require the **Manage Server** permission; their responses are visible only to the administrator executing the command.
+WHTBA provides four top-level slash commands. `/embed` and `/reaction` require the **Manage Server** permission; their responses are visible only to the administrator executing the command.
 
 `/stats` can be used by every member. Its replies are public unless `private:true` is set. Only `/stats sync` requires **Manage Server**.
 
@@ -276,6 +276,10 @@ Examples:
 - `/stats top-days`
 
 After the first installation, run `/stats sync action:Başlat` once to count the server's existing message history.
+
+### `/ping`
+
+Shows the bot's latency. The number is the gateway ping in milliseconds. Every member can use it.
 
 ## Discord Permissions
 
