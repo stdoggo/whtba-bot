@@ -14,6 +14,9 @@ export interface MessageLink {
 export interface MessagePreview {
 	link: MessageLink;
 	embed: EmbedBuilder;
+	// Bot embeds cannot hold videos. These links go into the reply text instead,
+	// where Discord turns them into a player below the preview.
+	videos: string[];
 }
 
 const MAX_LINKS = 3;
@@ -34,6 +37,24 @@ export const findMessageLinks = (content: string, guildId: string): MessageLink[
 		if (links.length >= MAX_LINKS) break;
 	}
 	return links;
+};
+
+const MAX_VIDEOS = 4;
+
+const isVideo = (name: string | null | undefined, contentType: string | null | undefined) =>
+	Boolean(contentType?.startsWith('video/')) || /\.(mp4|webm|mov|m4v)$/i.test(name ?? '');
+
+// Video attachments, then videos shown in the linked message's own embeds (YouTube,
+// GIF sites...). Fetched messages carry freshly signed attachment URLs.
+export const previewVideos = (target: Message): string[] => {
+	const urls: string[] = [];
+	for (const attachment of target.attachments.values()) {
+		if (isVideo(attachment.name, attachment.contentType)) urls.push(attachment.url);
+	}
+	for (const item of target.embeds) {
+		if (item.video && item.url && /^https?:\/\//.test(item.url)) urls.push(item.url);
+	}
+	return [...new Set(urls)].slice(0, MAX_VIDEOS);
 };
 
 const isImage = (name: string | null | undefined, contentType: string | null | undefined) =>
@@ -66,6 +87,7 @@ export const buildMessagePreview = (target: Message, link: MessageLink): EmbedBu
 	let image: string | undefined;
 	const files: string[] = [];
 	for (const attachment of target.attachments.values()) {
+		if (isVideo(attachment.name, attachment.contentType)) continue; // played below the preview
 		if (!image && isImage(attachment.name, attachment.contentType)) {
 			image = attachment.url;
 		}
@@ -79,7 +101,9 @@ export const buildMessagePreview = (target: Message, link: MessageLink): EmbedBu
 	const description = truncate(parts.join('\n\n'), MAX_TEXT);
 	if (description) embed.setDescription(description);
 	if (image) embed.setImage(image);
-	if (!description && !image) embed.setDescription('*İçerik görüntülenemiyor.*');
+	if (!description && !image) {
+		embed.setDescription(previewVideos(target).length ? '🎞️ Video aşağıda.' : '*İçerik görüntülenemiyor.*');
+	}
 	return embed;
 };
 
@@ -115,7 +139,7 @@ export const resolveMessagePreviews = async (message: Message, links: MessageLin
 			if (!channel || channel.guildId !== message.guildId || !canPreview(channel, message.channel, message.member)) continue;
 			if (!await canReadPrivateThread(channel, message.member!)) continue;
 			const target: Message = await channel.messages.fetch(link.messageId);
-			previews.push({ link, embed: buildMessagePreview(target, link) });
+			previews.push({ link, embed: buildMessagePreview(target, link), videos: previewVideos(target) });
 		}
 		catch {
 			// Deleted message, deleted channel or no access for the bot: no preview.

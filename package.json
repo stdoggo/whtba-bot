@@ -1,6 +1,6 @@
 {
   "name": "whtba-bot",
-  "version": "1.2.9",
+  "version": "1.2.10",
   "description": "bot attım (11/07/2019 07:46)",
   "main": "src/entry.ts",
   "scripts": {

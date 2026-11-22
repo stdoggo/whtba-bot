@@ -15,6 +15,24 @@ export interface AutomaticMediaOptions {
 	resolvePreviews?: (message: Message, links: MessageLink[]) => Promise<MessagePreview[]>;
 }
 
+const MAX_CONTENT = 2000;
+
+// Media lines, then each message link followed by its video links; video links that
+// would push the text over Discord's 2000 character limit are left out.
+export const replyContent = (links: MediaLink[], previews: MessagePreview[]): string => {
+	const blocks = [...links.map(proxyEmbedLine), ...previews.map(preview => preview.link.url)];
+	const length = () => blocks.join('\n\n').length;
+	previews.forEach((preview, index) => {
+		const block = links.length + index;
+		for (const video of preview.videos ?? []) {
+			const extended = blocks[block] + '\n' + video;
+			if (length() - blocks[block].length + extended.length > MAX_CONTENT) break;
+			blocks[block] = extended;
+		}
+	});
+	return blocks.join('\n\n');
+};
+
 export const handleAutomaticMedia = async (
 	message: Message,
 	prisma: any,
@@ -41,7 +59,7 @@ export const handleAutomaticMedia = async (
 	if (!links.length && !previews.length) return false;
 	// The message link is shown first (Discord renders it as "#channel ›"), its preview below.
 	const reply = await message.reply({
-		content: [...links.map(proxyEmbedLine), ...previews.map(preview => preview.link.url)].join('\n\n'),
+		content: replyContent(links, previews),
 		embeds: previews.map(preview => preview.embed),
 		allowedMentions: { parse: [], repliedUser: false },
 	});
