@@ -93,12 +93,17 @@ const defaultPresetFor = (interval: Interval | null): RangePreset => {
 };
 
 export const BOTS_NOTE = '🤖 Bot mesajları dahil';
+// Charts use plain text: the chart font has no emoji.
+const BOTS_CHART_NOTE = 'Bot mesajları dahil';
 
-const footerText = async (includeBots: boolean) => {
+// Shown under the first line of the description when bot messages are counted.
+const botsLine = (includeBots: boolean) => includeBots ? '\n' + BOTS_NOTE : '';
+const botsChartNotes = (includeBots: boolean) => includeBots ? [BOTS_CHART_NOTE] : [];
+
+const footerText = async () => {
 	const zone = statsTimeZone();
-	const notes = includeBots ? BOTS_NOTE + ' · ' : '';
-	if (await messageStats.isHistoryComplete()) return notes + 'Saat dilimi: ' + zone;
-	return notes + '⚠️ Geçmiş mesaj taraması tamamlanmadı; eski mesajlar eksik olabilir (/stats sync). Saat dilimi: ' + zone;
+	if (await messageStats.isHistoryComplete()) return 'Saat dilimi: ' + zone;
+	return '⚠️ Geçmiş mesaj taraması tamamlanmadı; eski mesajlar eksik olabilir (/stats sync). Saat dilimi: ' + zone;
 };
 
 const resolveNames = async (guild: Guild, ids: string[]): Promise<Map<string, string>> => {
@@ -170,12 +175,13 @@ const serverStats = async (command: ChatInputCommandInteraction, guild: Guild) =
 		title: scope + ' · ' + intervalNames[series.interval] + ' mesajlar',
 		subtitle: range.label + ' · toplam ' + plural(series.total, 'mesaj'),
 		labels: series.labels, values: series.values, highlightIndex: series.peakIndex,
+		notes: botsChartNotes(base.includeBots),
 	});
 	const unit = intervalUnits[series.interval];
 	const embed = new EmbedBuilder()
 		.setColor(EMBED_COLOR)
 		.setTitle('📊 Mesaj istatistikleri — ' + scope)
-		.setDescription('**' + range.label + '** · ' + intervalNames[series.interval] + ' görünüm')
+		.setDescription('**' + range.label + '** · ' + intervalNames[series.interval] + ' görünüm' + botsLine(base.includeBots))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Ortalama / ' + unit, value: formatNumber(Math.round(series.total / Math.max(series.starts.length, 1))), inline: true },
@@ -187,7 +193,7 @@ const serverStats = async (command: ChatInputCommandInteraction, guild: Guild) =
 			},
 		)
 		.setImage('attachment://stats.png')
-		.setFooter({ text: await footerText(base.includeBots) });
+		.setFooter({ text: await footerText() });
 	await command.editReply({ embeds: [embed], files: [chartFile(image)] });
 };
 
@@ -212,13 +218,14 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 		title: name + ' · ' + intervalNames[series.interval] + ' mesajlar',
 		subtitle: range.label + (channel ? ' · #' + channel.name : '') + ' · toplam ' + plural(series.total, 'mesaj'),
 		labels: series.labels, values: series.values, highlightIndex: series.peakIndex,
+		notes: botsChartNotes(base.includeBots),
 	});
 	const unit = intervalUnits[series.interval];
 	const embed = new EmbedBuilder()
 		.setColor(EMBED_COLOR)
 		.setTitle('👤 ' + name + ' — mesaj istatistikleri')
 		.setThumbnail(user.displayAvatarURL({ size: 128 }))
-		.setDescription('**' + range.label + '**' + (channel ? ' · <#' + channel.id + '>' : '') + ' · ' + intervalNames[series.interval] + ' görünüm')
+		.setDescription('**' + range.label + '**' + (channel ? ' · <#' + channel.id + '>' : '') + ' · ' + intervalNames[series.interval] + ' görünüm' + botsLine(base.includeBots))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Sıralama', value: rank.rank ? '#' + rank.rank + ' / ' + formatNumber(authors) : '—', inline: true },
@@ -232,7 +239,7 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 			},
 		)
 		.setImage('attachment://stats.png')
-		.setFooter({ text: await footerText(base.includeBots) });
+		.setFooter({ text: await footerText() });
 	if (channels.length) {
 		embed.addFields({
 			name: 'En aktif kanallar',
@@ -320,7 +327,7 @@ interface ListPage {
 	header: string;
 	total: number; // number of ranked items
 	lines: (offset: number) => Promise<string[]>;
-	chart: () => Promise<Buffer>;
+	chart: (notes: string[]) => Promise<Buffer>;
 	chartCount: number;
 	chartUnit: string;
 }
@@ -328,16 +335,17 @@ interface ListPage {
 const renderList = async (state: ListState, list: ListPage) => {
 	const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle(list.title);
 	if (!list.total) {
-		embed.setDescription(list.empty).setFooter({ text: await footerText(state.includeBots) });
+		embed.setDescription(list.empty + botsLine(state.includeBots)).setFooter({ text: await footerText() });
 		return { embeds: [embed], files: [], components: [] };
 	}
 	const pages = pageCount(list.total);
 	const current = { ...state, page: Math.min(Math.max(state.page, 0), pages - 1) };
 	const lines = await list.lines(current.page * PER_PAGE);
-	embed.setDescription(list.header + '\n\n' + lines.join('\n'))
+	embed.setDescription(list.header + botsLine(state.includeBots) + '\n\n' + lines.join('\n'))
 		.setImage('attachment://stats.png')
-		.setFooter({ text: 'Sayfa ' + (current.page + 1) + '/' + pages + ' · Grafik ilk ' + list.chartCount + ' ' + list.chartUnit + ' gösterir · ' + await footerText(state.includeBots) });
-	return { embeds: [embed], files: [chartFile(await list.chart())], components: pages > 1 ? [pageButtons(current, pages)] : [] };
+		.setFooter({ text: 'Sayfa ' + (current.page + 1) + '/' + pages + ' · ' + await footerText() });
+	const notes = ['Grafik ilk ' + list.chartCount + ' ' + list.chartUnit + ' gösterir', ...botsChartNotes(state.includeBots)];
+	return { embeds: [embed], files: [chartFile(await list.chart(notes))], components: pages > 1 ? [pageButtons(current, pages)] : [] };
 };
 
 // Range tokens make a command's date range reproducible from a button ID.
@@ -392,7 +400,8 @@ const buildDaysView = async (guild: Guild, state: ListState) => {
 		lines: async offset => ranked.slice(offset, offset + PER_PAGE).map(([day, count], index) =>
 			rankPrefix(offset + index + 1, ranked.length) + ' **' + formatDay(day) + '**, ' + formatWeekday(day) +
 				' — **' + formatNumber(count) + '** mesaj'),
-		chart: async () => renderRanking({
+		chart: async notes => renderRanking({
+			notes,
 			title: 'En yoğun ' + chartDays.length + ' gün · ' + scope,
 			subtitle: 'Tüm zamanlar',
 			labels: chartDays.map(([day]) => bucketLabel(day, 'day', true)),
@@ -429,9 +438,10 @@ const buildUsersView = async (guild: Guild, state: ListState) => {
 			}
 			return lines;
 		},
-		chart: async () => {
+		chart: async notes => {
 			const names = await resolveNames(guild, top.map(item => item.id));
 			return renderRanking({
+				notes,
 				title: 'En çok mesaj atanlar · ' + scope,
 				subtitle: range.label + ' · toplam ' + plural(total, 'mesaj'),
 				labels: top.map(item => names.get(item.id)!),
@@ -462,7 +472,8 @@ const buildChannelsView = async (guild: Guild, state: ListState) => {
 			return page.map((item, index) => rankPrefix(offset + index + 1, channels) + ' <#' + item.id + '> — **' +
 				formatNumber(item.count) + '** mesaj (' + percent(item.count, total) + ')');
 		},
-		chart: async () => renderRanking({
+		chart: async notes => renderRanking({
+			notes,
 			title: 'En aktif kanallar · ' + guild.name,
 			subtitle: range.label + ' · toplam ' + plural(total, 'mesaj'),
 			labels: await Promise.all(top.map(item => channelName(guild, item.id))),

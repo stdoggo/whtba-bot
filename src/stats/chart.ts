@@ -84,6 +84,26 @@ const valueLabels = (horizontal: boolean): Plugin => ({
 	},
 });
 
+// Small muted notes in the bottom-right corner of the chart, e.g. "Bot mesajları dahil".
+const NOTE_SPACE = 22;
+const cornerNotes = (notes: string[]): Plugin => ({
+	id: 'whtba-notes',
+	afterDraw: chart => {
+		if (!notes.length) return;
+		const { ctx } = chart;
+		ctx.save();
+		ctx.fillStyle = COLORS.muted;
+		ctx.font = '13px ' + fontFamily();
+		ctx.textAlign = 'right';
+		ctx.textBaseline = 'bottom';
+		ctx.fillText(notes.join('  ·  '), chart.width - 12, chart.height - 6);
+		ctx.restore();
+	},
+});
+
+const padding = (right: number, notes: string[]) =>
+	({ left: 12, right, top: 8, bottom: 8 + (notes.length ? NOTE_SPACE : 0) });
+
 const render = (config: ChartConfiguration, plugins: Plugin[]): Buffer => {
 	const canvas = createCanvas(WIDTH, HEIGHT);
 	const family = fontFamily();
@@ -114,10 +134,11 @@ export interface SeriesChart {
 	labels: string[];
 	values: number[];
 	highlightIndex?: number;
+	notes?: string[];
 }
 
 // Bar chart for up to ~62 buckets, filled line chart for longer series.
-export const renderTimeSeries = ({ title, subtitle, labels, values, highlightIndex }: SeriesChart): Buffer => {
+export const renderTimeSeries = ({ title, subtitle, labels, values, highlightIndex, notes = [] }: SeriesChart): Buffer => {
 	const asLine = values.length > 62;
 	const colors = values.map((_, index) => index === highlightIndex ? COLORS.highlight : COLORS.accent);
 	return render({
@@ -137,14 +158,14 @@ export const renderTimeSeries = ({ title, subtitle, labels, values, highlightInd
 			} as any],
 		},
 		options: {
-			layout: { padding: { left: 12, right: 24, top: 8, bottom: 8 } },
+			layout: { padding: padding(24, notes) },
 			plugins: titleOptions(title, subtitle),
 			scales: {
 				x: { grid: { display: false }, ticks: { color: COLORS.muted, font: { size: 13 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 14 } },
 				y: { beginAtZero: true, grace: '8%', grid: { color: COLORS.grid }, ticks: { color: COLORS.muted, font: { size: 13 }, precision: 0, callback: (v: any) => formatNumber(Number(v)) } },
 			},
 		},
-	}, asLine ? [] : [valueLabels(false)]);
+	}, asLine ? [cornerNotes(notes)] : [valueLabels(false), cornerNotes(notes)]);
 };
 
 export interface RankingChart {
@@ -152,9 +173,10 @@ export interface RankingChart {
 	subtitle?: string;
 	labels: string[];
 	values: number[];
+	notes?: string[];
 }
 
-export const renderRanking = ({ title, subtitle, labels, values }: RankingChart): Buffer => {
+export const renderRanking = ({ title, subtitle, labels, values, notes = [] }: RankingChart): Buffer => {
 	const trimmed = labels.map(label => label.length > 26 ? label.slice(0, 25) + '…' : label);
 	return render({
 		type: 'bar',
@@ -164,12 +186,12 @@ export const renderRanking = ({ title, subtitle, labels, values }: RankingChart)
 		},
 		options: {
 			indexAxis: 'y',
-			layout: { padding: { left: 12, right: 72, top: 8, bottom: 8 } },
+			layout: { padding: padding(72, notes) },
 			plugins: titleOptions(title, subtitle),
 			scales: {
 				x: { beginAtZero: true, grid: { color: COLORS.grid }, ticks: { color: COLORS.muted, font: { size: 13 }, precision: 0, callback: (v: any) => formatNumber(Number(v)) } },
 				y: { grid: { display: false }, ticks: { color: COLORS.text, font: { size: values.length > 15 ? 13 : 15 }, autoSkip: false } },
 			},
 		},
-	}, [valueLabels(true)]);
+	}, [valueLabels(true), cornerNotes(notes)]);
 };
