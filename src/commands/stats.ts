@@ -250,8 +250,7 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 		.setColor(EMBED_COLOR)
 		.setTitle('👤 ' + name + ' — mesaj istatistikleri')
 		.setThumbnail(user.displayAvatarURL({ size: 128 }))
-		.setDescription(summaryLine(range.label, series.total, activeDaysText(series.days), channel ? '<#' + channel.id + '>' : '',
-			intervalNames[series.interval] + ' görünüm') + await botsLine(filter))
+		.setDescription('**' + range.label + '**' + (channel ? ' · <#' + channel.id + '>' : '') + ' · ' + intervalNames[series.interval] + ' görünüm' + await botsLine(filter))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Sıralama', value: rank.rank ? '#' + rank.rank + ' / ' + formatNumber(authors) : '—', inline: true },
