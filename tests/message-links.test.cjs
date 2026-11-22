@@ -112,7 +112,7 @@ const sourceMessage = (content, actions) => ({
   reply: async payload => { actions.push(['reply', payload]); return payload; },
   suppressEmbeds: async state => actions.push(['suppress', state]),
 });
-const fakePreviews = async (_message, links) => links.map(item => ({ link: item, embed: { preview: item.messageId }, videos: [] }));
+const fakePreviews = async (_message, links) => links.map(item => ({ link: item, embed: { preview: item.messageId } }));
 
 test('a message link replies with the link and its preview, without ping, suppress or votes', async () => {
   const actions = [];
@@ -165,30 +165,22 @@ test('message link setting is on by default and stored only when changed', () =>
   assert.equal(off.messageLinks, false);
 });
 
-test('videos are not shown as files in the preview but returned for the reply text', () => {
-  const { previewVideos } = require('../src/media/message-links');
+test('videos are named in the preview without a link; the reply holds only the message link', async () => {
   const attachments = new Collection([
     ['1', { name: 'Niche_or_larp_meme.webm', contentType: 'video/webm', url: 'https://cdn/meme.webm' }],
-    ['2', { name: 'clip.MP4', contentType: null, url: 'https://cdn/clip.MP4' }],
-    ['3', { name: 'notlar.pdf', contentType: 'application/pdf', url: 'https://cdn/notlar.pdf' }],
+    ['2', { name: 'notlar.pdf', contentType: 'application/pdf', url: 'https://cdn/notlar.pdf' }],
   ]);
-  const embeds = [{ url: 'https://www.youtube.com/watch?v=abc', video: { url: 'https://www.youtube.com/embed/abc' } }, { url: 'https://example.org' }];
-  const message = fakeMessage({ content: '', attachments, embeds });
-  assert.deepEqual(previewVideos(message), ['https://cdn/meme.webm', 'https://cdn/clip.MP4', 'https://www.youtube.com/watch?v=abc']);
-  const embed = buildMessagePreview(message, target).toJSON();
-  assert.ok(!embed.description.includes('meme.webm'));
-  assert.match(embed.description, /notlar\.pdf/);
-  const onlyVideo = buildMessagePreview(fakeMessage({ content: '', attachments: new Collection([attachments.first()].map(a => ['1', a])) }), target).toJSON();
-  assert.equal(onlyVideo.description, '🎞️ Video aşağıda.');
-});
+  const embed = buildMessagePreview(fakeMessage({ content: '', attachments }), target).toJSON();
+  assert.match(embed.description, /^🎞️ Niche\\_or\\_larp\\_meme\.webm$/m);
+  assert.ok(!embed.description.includes('https://cdn/meme.webm'), 'no video link');
+  assert.match(embed.description, /📎 \[notlar\.pdf\]/);
+  const onlyVideo = buildMessagePreview(fakeMessage({ content: '', attachments: new Collection([['1', attachments.first()]]) }), target).toJSON();
+  assert.equal(onlyVideo.description, '🎞️ Niche\\_or\\_larp\\_meme.webm');
 
-test('reply text: link, then its videos; stays within 2000 characters', () => {
-  const { replyContent } = require('../src/media/automatic');
-  const preview = (id, videos) => ({ link: { url: link(C1, id) }, embed: {}, videos });
-  assert.equal(replyContent([], [preview(M1, ['https://cdn/a.webm', 'https://cdn/b.mp4'])]),
-    link(C1, M1) + '\nhttps://cdn/a.webm\nhttps://cdn/b.mp4');
-  const long = 'https://cdn.discordapp.com/attachments/' + 'x'.repeat(300) + '.mp4';
-  const content = replyContent([], [1, 2, 3].map(i => preview('42345678901234567' + i, [long, long + '1', long + '2', long + '3'])));
-  assert.ok(content.length <= 2000, String(content.length));
-  for (const i of [1, 2, 3]) assert.ok(content.includes(link(C1, '42345678901234567' + i)), 'every message link is kept');
+  const actions = [];
+  await handleAutomaticMedia(sourceMessage(link(C1, M1), actions), settingsPrisma({ enabled: true }), [], undefined, {
+    messageLinks: findMessageLinks(link(C1, M1), guild),
+    resolvePreviews: async (_m, links) => links.map(item => ({ link: item, embed: buildMessagePreview(fakeMessage({ attachments }), item) })),
+  });
+  assert.equal(actions[0][1].content, link(C1, M1));
 });

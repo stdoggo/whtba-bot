@@ -47,7 +47,7 @@ Media previews are handled by Discord and external services. Playback availabili
 
 When a member posts a link to a message in this server (`https://discord.com/channels/...`), WHTBA replies with the link and a quote-style preview: author, text, first image, other attachments and the time it was sent.
 
-- Videos cannot be placed inside a bot embed, so video attachments (and videos from the linked message's own embeds, e.g. YouTube) are added as links in the reply text. Discord shows them as playable videos below the preview. The links are visible as text.
+- Bot embeds cannot play videos, so video attachments are listed by file name (🎞️, without a link).
 - Up to three message links per message; `ptb.`, `canary.` and `discordapp.com` links work too.
 - Links wrapped in `<...>` are not previewed, as in Discord.
 - Follows the `/embed preview` settings: the main switch and the allowed channels. It can also be turned off on its own with `/embed preview action:Mesaj linki önizlemesini aç / kapat enabled:false`.
