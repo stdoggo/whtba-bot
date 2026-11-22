@@ -48,6 +48,19 @@ const add = (channel, message) => {
   await prisma.messageAuthor.deleteMany();
   await prisma.messageSyncChannel.deleteMany();
   await prisma.messageStatsState.deleteMany();
+  await prisma.messageHourStat.deleteMany();
+  await store.prepareStatsDatabase(prisma);
+  assert.equal((await prisma.$queryRawUnsafe('PRAGMA journal_mode'))[0].journal_mode, 'wal');
+
+  // The hourly summary must always match MessageLog exactly.
+  const summaryMatchesLog = async label => {
+    const fromLog = await prisma.$queryRawUnsafe(`SELECT ((("id" >> 22) + 1420070400000) / 3600000) AS h, "isBot" AS b, COUNT(*) AS n
+      FROM "MessageLog" GROUP BY 1, 2 ORDER BY 1, 2`);
+    const fromSummary = await prisma.$queryRawUnsafe(`SELECT "hour" AS h, "isBot" AS b, "count" AS n
+      FROM "MessageHourStat" WHERE "count" > 0 ORDER BY 1, 2`);
+    const norm = rows => rows.map(r => [Number(r.h), Number(r.b), Number(r.n)]);
+    assert.deepEqual(norm(fromSummary), norm(fromLog), 'hourly summary out of sync: ' + label);
+  };
 
   const general = fakeChannel('100', ChannelType.GuildText);
   const forum = fakeChannel('200', ChannelType.GuildForum);
@@ -91,6 +104,9 @@ const add = (channel, message) => {
   const live = add(general, makeMessage(general, '2024-01-01T12:00:00Z', '1'));
   service.record(live);
   await service.flush();
+  service.record(live); // duplicate delivery must not be counted twice
+  await service.flush();
+  await summaryMatchesLog('live duplicate');
 
   assert.equal(await service.startBackfill(guild), 'started');
   for (let i = 0; i < 200 && (await service.getProgress()).running; i++) await new Promise(r => setTimeout(r, 25));
@@ -124,9 +140,11 @@ const add = (channel, message) => {
   const march = { startId: time.msToSnowflake(range.startMs), endId: time.msToSnowflake(range.endMs) };
   assert.equal(await store.countMessages(prisma, march), 250);
 
+  await summaryMatchesLog('after history scan');
   // Deleting a message removes it from the statistics.
   await service.forget([live.id]);
   assert.equal(await store.countMessages(prisma, everything), 285);
+  await summaryMatchesLog('after delete');
 
   // Messages sent while the bot was offline are caught up on the next session.
   const fetchesBefore = general.fetches;
@@ -153,6 +171,13 @@ const add = (channel, message) => {
   await store.saveAuthorNames(prisma, [{ id: '1', name: 'Yeni Ad' }]);
   await store.saveAuthorNames(prisma, [{ id: '1', name: 'Eski Ad' }], false);
   assert.equal((await store.getAuthorNames(prisma, ['1'])).get('1'), 'Yeni Ad');
+
+  await summaryMatchesLog('after catch-up and rescan');
+
+  // A summary that drifted (e.g. triggers missing while rows changed) is rebuilt at startup.
+  await prisma.$executeRawUnsafe('UPDATE "MessageHourStat" SET "count" = "count" + 5');
+  await store.prepareStatsDatabase(prisma);
+  await summaryMatchesLog('after rebuild');
 
   await service.shutdown();
   console.log('Stats smoke test OK: history scan, threads, live, delete, catch-up, rankings, top days.');

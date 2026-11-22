@@ -13,6 +13,7 @@ import { isSelectChannelsComponent, processSelectChannelsComponent } from './com
 import { PrismaClient } from '@prisma/client';
 import { isStatsComponent, processStatsComponent } from './commands/stats';
 import { MessageStatsService } from './stats/service';
+import { prepareStatsDatabase } from './stats/store';
 
 // Local SQLite database. Prisma reads DATABASE_URL from .env.
 // No PostgreSQL server, Redis instance or external database service is used.
@@ -52,6 +53,7 @@ let clientReady = false;
 discordClient.once(Events.ClientReady, async () => {
 	try {
 		await processLoad(discordClient, prismaClient);
+		await prepareStatsDatabase(prismaClient);
 	}
 	catch (e) {
 		console.error(e);

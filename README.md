@@ -299,11 +299,13 @@ Back up the following file:
 
 `prisma/whtba.db`
 
+The database runs in SQLite WAL mode so statistics can be read while messages are being written. While the bot runs, SQLite also keeps `prisma/whtba.db-wal` and `prisma/whtba.db-shm` next to it. They are merged into `whtba.db` and removed when the bot stops normally (Ctrl+C). If they are still present, the bot did not stop cleanly: copy them together with `whtba.db`, or start and stop the bot once before copying.
+
 Store the backup in a safe location.
 
 ### Restore
 
-Stop the bot and replace `prisma/whtba.db` with a valid backup created using a compatible database schema.
+Stop the bot, delete any `prisma/whtba.db-wal` and `prisma/whtba.db-shm` files, and replace `prisma/whtba.db` with a valid backup created using a compatible database schema (restore its `-wal` file too if the backup has one).
 
 Start the bot normally afterward.
 
