@@ -108,7 +108,7 @@ const botMessageCount = async (filter: StatsFilter) => {
 // Shown under the first line of the description when bot messages are counted,
 // e.g. "🤖 Bot mesajları dahil (**1.234** mesaj)".
 const botsLine = async (filter: StatsFilter) => filter.includeBots
-	? '\n' + BOTS_NOTE + ' (**' + formatNumber(await botMessageCount(filter)) + '** mesaj)'
+	? '\n' + BOTS_NOTE + ' ('formatNumber(await botMessageCount(filter))' mesaj)'
 	: '';
 const botsChartNotes = (includeBots: boolean) => includeBots ? [BOTS_CHART_NOTE] : [];
 
