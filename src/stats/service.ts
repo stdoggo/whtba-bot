@@ -5,6 +5,7 @@ import {
 import {
 	LoggedMessage, deleteMessages, getState, insertMessages, saveAuthorNames, setState,
 } from './store';
+import { msToSnowflake } from './time';
 
 // Message statistics run in three layers:
 // 1. Live tracking: every new message is queued and written in small batches.
@@ -28,6 +29,7 @@ const FLUSH_SIZE = 100;
 const WATERMARK_FLUSH_MS = 30000;
 const BACKFILL_CONCURRENCY = 3;
 const PAGE = 100;
+const FLUSH_RETRY_MS = 5000;
 
 type AnyChannel = any;
 
@@ -156,6 +158,8 @@ export class MessageStatsService {
 		const removed = new Set(ids);
 		this.queue = this.queue.filter(row => !removed.has(row.id));
 		await this.flushChain;
+		// A failed flush may have put the rows back in the queue meanwhile.
+		this.queue = this.queue.filter(row => !removed.has(row.id));
 		await deleteMessages(this.prisma, ids);
 	}
 
@@ -164,7 +168,13 @@ export class MessageStatsService {
 			clearTimeout(this.flushTimer);
 			this.flushTimer = null;
 		}
-		this.flushChain = this.flushChain.then(() => this.flushNow()).catch(error => console.error('Message stats flush:', error));
+		this.flushChain = this.flushChain.then(() => this.flushNow()).catch(error => {
+			console.error('Message stats flush:', error);
+			if (this.queue.length && !this.flushTimer) {
+				this.flushTimer = setTimeout(() => void this.flush(), FLUSH_RETRY_MS);
+				this.flushTimer.unref?.();
+			}
+		});
 		return this.flushChain;
 	}
 
@@ -179,6 +189,7 @@ export class MessageStatsService {
 			catch (error) {
 				// Keep the rows for the next attempt unless the queue is growing without bound.
 				if (this.queue.length < 10000) this.queue.unshift(...rows);
+				for (const { id, name } of names) if (!this.pendingNames.has(id)) this.pendingNames.set(id, name);
 				throw error;
 			}
 		}
@@ -293,9 +304,14 @@ export class MessageStatsService {
 						else if (session === this.session) this.live.add(channel.id);
 					}
 					else if (historyDone && last !== null && !this.backfillRunning) {
-						// A channel created while the bot was offline after the history scan finished.
+						// A channel created while the bot was offline after the history scan finished,
+						// or one that was empty or unreadable during the scan: read it from the start.
 						await this.ensureSyncRow(channel);
-						fetched += await this.backfillChannel(channel, session, () => session !== this.session);
+						await this.prisma.messageSyncChannel.updateMany({
+							where: { id: BigInt(channel.id), watermark: null },
+							data: { backfillDone: false, backfillCursor: null, lastError: null },
+						});
+						fetched += (await this.backfillChannel(channel, session, () => session !== this.session)).count;
 					}
 				}
 				catch (error) {
@@ -316,7 +332,7 @@ export class MessageStatsService {
 			if (session !== this.session) return total;
 			const page: Collection<string, Message> = await withRetry(() =>
 				channel.messages.fetch({ after: cursor.toString(), limit: PAGE, cache: false }));
-			await this.storePage(page, isThreadChannel(channel) ? channel.parentId : null, false);
+			await this.storePage(page, isThreadChannel(channel) ? channel.parentId : null);
 			total += page.size;
 			const newest = maxId(page.keys());
 			if (newest !== null && newest > cursor) {
@@ -329,7 +345,9 @@ export class MessageStatsService {
 		return total;
 	}
 
-	private async storePage(page: Collection<string, Message>, parentId: string | null, olderNames: boolean) {
+	// Fetched pages carry no member data (no server nicknames), so they only fill in
+	// names that are not known yet and never overwrite one saved from a live message.
+	private async storePage(page: Collection<string, Message>, parentId: string | null) {
 		const rows: LoggedMessage[] = [];
 		const names = new Map<string, string>();
 		for (const message of page.values()) {
@@ -340,8 +358,7 @@ export class MessageStatsService {
 			if (name && !names.has(row.authorId) && !this.savedNames.has(row.authorId)) names.set(row.authorId, name);
 		}
 		await insertMessages(this.prisma, rows);
-		// History pages are older than what we already know, so they never overwrite a saved name.
-		await saveAuthorNames(this.prisma, [...names].map(([id, name]) => ({ id, name })), !olderNames);
+		await saveAuthorNames(this.prisma, [...names].map(([id, name]) => ({ id, name })), false);
 	}
 
 	// -------------------------------------------------------------------------
@@ -402,29 +419,38 @@ export class MessageStatsService {
 		const session = this.session;
 		const targets = await this.discoverTargets(guild);
 		for (const channel of targets) await this.ensureSyncRow(channel);
+		// Channels that failed with an access error were discovered as readable now,
+		// so scan them again.
+		const targetIds = targets.map(channel => BigInt(channel.id));
+		await this.prisma.messageSyncChannel.updateMany({
+			where: { id: { in: targetIds }, backfillDone: true, lastError: { not: null } },
+			data: { backfillDone: false, lastError: null },
+		});
 		const done = new Set((await this.prisma.messageSyncChannel.findMany({
 			where: { backfillDone: true }, select: { id: true },
 		})).map((row: { id: bigint }) => String(row.id)));
 		const pending = targets.filter(channel => !done.has(channel.id));
-		this.progress.total = targets.length;
+		// Unreadable channels found during discovery count towards the total as skipped.
+		this.progress.total = targets.length + this.progress.skipped;
 		this.progress.done = targets.length - pending.length;
 
 		const worker = async () => {
 			while (pending.length && !this.stopRequested) {
 				const channel = pending.shift();
-				const ok = await this.backfillChannel(channel, session, () => this.stopRequested).then(() => true, error => {
+				const result = await this.backfillChannel(channel, session, () => this.stopRequested).catch(error => {
 					console.error('Message stats history scan failed for channel', channel.id, error);
-					return false;
+					return null;
 				});
-				if (ok) this.progress.done++;
-				else this.progress.failed++;
+				if (!result) this.progress.failed++;
+				else if (result.skipped) this.progress.skipped++;
+				else if (!this.stopRequested) this.progress.done++;
 			}
 		};
 		await Promise.all(Array.from({ length: BACKFILL_CONCURRENCY }, worker));
 		await this.flush();
 		if (this.stopRequested) return;
 
-		const remaining = await this.prisma.messageSyncChannel.count({ where: { backfillDone: false, id: { in: targets.map(c => BigInt(c.id)) } } });
+		const remaining = await this.prisma.messageSyncChannel.count({ where: { backfillDone: false, id: { in: targetIds } } });
 		await setState(this.prisma, 'backfill.status', remaining ? 'partial' : 'done');
 		await setState(this.prisma, 'backfill.finishedAt', String(Date.now()));
 		console.log('Message stats: history scan finished (' + this.progress.fetched + ' messages read, ' + remaining + ' channels incomplete).');
@@ -485,10 +511,10 @@ export class MessageStatsService {
 	}
 
 	// Reads one channel backwards from its saved cursor to its first message.
-	private async backfillChannel(channel: AnyChannel, session: number, shouldStop: () => boolean): Promise<number> {
+	private async backfillChannel(channel: AnyChannel, session: number, shouldStop: () => boolean): Promise<{ count: number; skipped: boolean }> {
 		const id = BigInt(channel.id);
 		const row = await this.prisma.messageSyncChannel.findUnique({ where: { id } });
-		if (row?.backfillDone) return 0;
+		if (row?.backfillDone) return { count: 0, skipped: Boolean(row.lastError) };
 		const parentId = isThreadChannel(channel) ? channel.parentId : null;
 		let before: string | undefined = row?.backfillCursor ? String(row.backfillCursor) : undefined;
 		let firstPage = true;
@@ -497,16 +523,16 @@ export class MessageStatsService {
 		try {
 			while (!shouldStop()) {
 				let page: Collection<string, Message>;
+				const fetchedAt = Date.now();
 				try {
 					page = await withRetry(() => channel.messages.fetch({ limit: PAGE, before, cache: false }));
 				}
 				catch (error) {
 					if (!isFatal(error)) throw error;
 					await this.prisma.messageSyncChannel.update({ where: { id }, data: { backfillDone: true, lastError: (error as Error).message.slice(0, 200) } });
-					this.progress.skipped++;
-					return total;
+					return { count: total, skipped: true };
 				}
-				await this.storePage(page, parentId, true);
+				await this.storePage(page, parentId);
 				total += page.size;
 				this.progress.fetched += page.size;
 				const oldest = minId(page.keys());
@@ -521,9 +547,10 @@ export class MessageStatsService {
 					},
 				});
 				if (firstPage && !before) {
-					// The newest page doubles as the starting point for gap catch-up.
-					const newest = maxId(page.keys());
-					if (newest !== null) {
+					// The newest page doubles as the starting point for gap catch-up. An empty
+					// channel starts from the moment it was read: everything before is known.
+					const newest = maxId(page.keys()) ?? msToSnowflake(fetchedAt) - 1n;
+					if (newest >= 0n) {
 						const updated = await this.prisma.messageSyncChannel.updateMany({ where: { id, watermark: null }, data: { watermark: newest } });
 						if (updated.count && this.trackingLoaded && session === this.session) {
 							this.watermarked.add(channel.id);
@@ -539,6 +566,6 @@ export class MessageStatsService {
 		finally {
 			this.current.delete(channel.id);
 		}
-		return total;
+		return { count: total, skipped: false };
 	}
 }

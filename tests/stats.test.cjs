@@ -127,3 +127,44 @@ test('system messages are not counted and thread messages belong to the parent c
   assert.equal(thread.syncId, '300');
   assert.equal(toLoggedMessage({ ...base, webhookId: '9' }).isBot, true);
 });
+
+test('a failed live flush is retried and does not resurrect deleted messages', async () => {
+  const { MessageStatsService } = require('../src/stats/service');
+  const inserted = [];
+  let fail = true;
+  const prisma = {
+    $executeRaw: async (strings, ...values) => {
+      if (fail) throw new Error('database is locked');
+      // Prisma.join() nests the row values inside a Sql object.
+      inserted.push(...values.flatMap(value => value?.values ?? [value]));
+      return 1;
+    },
+    messageLog: { deleteMany: async () => ({ count: 0 }) },
+  };
+  const service = new MessageStatsService(prisma);
+  const author = { id: '42', bot: false, username: 'u', globalName: null };
+  const message = id => ({ id, guildId: '1', channelId: '200', author, system: false, webhookId: null, channel: { type: 0 }, member: null });
+  service.record(message('1001'));
+  service.record(message('1002'));
+  await service.flush();
+  assert.ok(service.flushTimer, 'a retry is scheduled after a failed flush');
+  await service.forget(['1001']);
+  fail = false;
+  await service.flush();
+  const ids = inserted.map(String);
+  assert.ok(ids.includes('1002'));
+  assert.ok(!ids.includes('1001'), 'deleted message must not be inserted on retry');
+  clearTimeout(service.flushTimer);
+});
+
+test('dates before Discord existed are rejected', () => {
+  assert.equal(time.parseDateInput('0024'), null);
+  assert.equal(time.parseDateInput('24.03.0099'), null);
+  assert.equal(time.parseDateInput('2014-12'), null);
+  assert.ok(time.parseDateInput('2015'));
+});
+
+test('invalid date errors do not echo backticks', () => {
+  assert.throws(() => time.resolveRange({ from: '`@everyone`', nowMs: Date.now(), earliestMs: 0, zone: 'UTC' }),
+    error => !error.message.includes('`@everyone`') && error.message.includes("'@everyone'"));
+});

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 require('ts-node/register/transpile-only');
 const { PrismaClient } = require('@prisma/client');
-const { Collection, ChannelType } = require('discord.js');
+const { Collection, ChannelType, DiscordAPIError } = require('discord.js');
 
 // CI-only integration test for message statistics against the disposable
 // ci-whtba.db. It simulates Discord channels; it never connects to Discord.
@@ -62,11 +62,23 @@ const add = (channel, message) => {
   for (let i = 0; i < 30; i++) add(thread, makeMessage(thread, '2023-06-01T12:00:00Z', '2'));
   for (let i = 0; i < 5; i++) add(archived, makeMessage(archived, '2021-12-31T22:30:00Z', '3')); // 1 Jan 2022 in Istanbul
 
-  const guildChannels = new Collection([[general.id, general], [forum.id, forum]]);
+  // Empty during the scan; receives messages later while the bot is offline.
+  const empty = fakeChannel('500', ChannelType.GuildText);
+  // The bot has no access during the first scan; access is granted later.
+  const locked = fakeChannel('600', ChannelType.GuildText);
+  for (let i = 0; i < 4; i++) add(locked, makeMessage(locked, '2022-05-05T12:00:00Z', '5'));
+  let lockedDenied = true;
+  const lockedFetch = locked.messages.fetch;
+  locked.messages.fetch = async options => {
+    if (lockedDenied) throw new DiscordAPIError({ code: 50001, message: 'Missing Access' }, 50001, 403, 'GET', '/channels/600/messages', {});
+    return lockedFetch(options);
+  };
+
+  const guildChannels = new Collection([[general.id, general], [forum.id, forum], [empty.id, empty], [locked.id, locked]]);
   const guild = {
     members: { me: {}, cache: new Collection() },
     channels: {
-      cache: new Collection([[general.id, general], [forum.id, forum], [thread.id, thread]]),
+      cache: new Collection([[general.id, general], [forum.id, forum], [thread.id, thread], [empty.id, empty], [locked.id, locked]]),
       fetch: async () => guildChannels,
       fetchActiveThreads: async () => ({ threads: new Collection([[thread.id, thread]]) }),
     },
@@ -84,7 +96,9 @@ const add = (channel, message) => {
   for (let i = 0; i < 200 && (await service.getProgress()).running; i++) await new Promise(r => setTimeout(r, 25));
   const progress = await service.getProgress();
   assert.equal(progress.status, 'done');
-  assert.equal(progress.totalChannels, 3);
+  assert.equal(progress.totalChannels, 5);
+  assert.equal(progress.doneChannels, 4, 'the inaccessible channel is not counted as done');
+  assert.equal(progress.skippedChannels, 1);
   assert.equal(await service.isHistoryComplete(), true);
 
   const everything = { startId: 0n, endId: 1n << 62n };
@@ -117,11 +131,23 @@ const add = (channel, message) => {
   // Messages sent while the bot was offline are caught up on the next session.
   const fetchesBefore = general.fetches;
   for (let i = 0; i < 120; i++) add(general, makeMessage(general, '2024-02-02T12:00:00Z', '4'));
+  // Sent after the scan (i.e. now), while the bot was offline.
+  for (let i = 0; i < 7; i++) add(empty, makeMessage(empty, new Date(Date.now() + 1000).toISOString(), '6'));
+  await store.saveAuthorNames(prisma, [{ id: '4', name: 'Takma Ad' }]);
   await service.onSessionReady(guild);
   for (let i = 0; i < 200 && (await service.getProgress()).catchUpRunning; i++) await new Promise(r => setTimeout(r, 25));
   assert.equal(await store.countMessages(prisma, { ...everything, authorId: '4' }), 120);
   assert.equal(general.fetches - fetchesBefore, 2, 'catch-up pages forward from the watermark');
   assert.equal(thread.fetches, 1, 'channels without new messages are not fetched again');
+  assert.equal(await store.countMessages(prisma, { ...everything, channelId: '500' }), 7, 'channel that was empty during the scan');
+  assert.equal((await store.getAuthorNames(prisma, ['4'])).get('4'), 'Takma Ad', 'catch-up keeps the saved display name');
+
+  // Access granted later: running the scan again picks up the previously denied channel.
+  lockedDenied = false;
+  assert.equal(await service.startBackfill(guild), 'started');
+  for (let i = 0; i < 200 && (await service.getProgress()).running; i++) await new Promise(r => setTimeout(r, 25));
+  assert.equal(await store.countMessages(prisma, { ...everything, channelId: '600' }), 4, 'previously inaccessible channel');
+  assert.equal((await service.getProgress()).skippedChannels, 0);
 
   // Author names: history never overwrites a newer live name.
   await store.saveAuthorNames(prisma, [{ id: '1', name: 'Yeni Ad' }]);

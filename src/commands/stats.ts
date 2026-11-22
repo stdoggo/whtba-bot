@@ -240,9 +240,12 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 	await command.editReply({ embeds: [embed], files: [chartFile(image)] });
 };
 
+const readLimit = (command: ChatInputCommandInteraction) =>
+	Math.min(Math.max(command.options.getInteger('limit') ?? 20, 3), 25);
+
 const leaderboard = async (command: ChatInputCommandInteraction, guild: Guild) => {
 	const channel = command.options.getChannel('channel');
-	const limit = command.options.getInteger('limit') ?? 20;
+	const limit = readLimit(command);
 	const base = { channelId: channel?.id, includeBots: command.options.getBoolean('include-bots') ?? false };
 	const range = await readRange(command, guild, base, 'all');
 	const filter = filterFor(range, base);
@@ -265,7 +268,7 @@ const leaderboard = async (command: ChatInputCommandInteraction, guild: Guild) =
 	const names = await resolveNames(guild, top.map(item => item.id));
 	const lines = top.map((item, index) => '`' + String(index + 1).padStart(2) + '.` <@' + item.id + '> — **' +
 		formatNumber(item.count) + '** (' + percent(item.count, total) + ')');
-	if (own.rank > limit) lines.push('…\n`' + own.rank + '.` <@' + command.user.id + '> — **' + formatNumber(own.count) + '** (sen)');
+	if (own.rank && !top.some(item => item.id === command.user.id)) lines.push('…\n`' + own.rank + '.` <@' + command.user.id + '> — **' + formatNumber(own.count) + '** (sen)');
 	embed.setDescription('**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(authors, 'üye') + '\n\n' + lines.join('\n'))
 		.setImage('attachment://stats.png');
 	const image = renderRanking({
@@ -278,7 +281,7 @@ const leaderboard = async (command: ChatInputCommandInteraction, guild: Guild) =
 };
 
 const channelRanking = async (command: ChatInputCommandInteraction, guild: Guild) => {
-	const limit = command.options.getInteger('limit') ?? 20;
+	const limit = readLimit(command);
 	const base = { includeBots: command.options.getBoolean('include-bots') ?? false };
 	const range = await readRange(command, guild, base, 'all');
 	const filter = filterFor(range, base);
@@ -545,7 +548,7 @@ export const stats: Command = {
 		}
 		catch (error) {
 			if (error instanceof StatsInputError) {
-				await command.editReply({ content: error.message, embeds: [], files: [] });
+				await command.editReply({ content: error.message, embeds: [], files: [], allowedMentions: { parse: [] } });
 				return;
 			}
 			throw error;

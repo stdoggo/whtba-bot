@@ -197,7 +197,10 @@ export interface DateSpan { first: number; last: number; }
 export const parseDateInput = (input: string): DateSpan | null => {
 	const text = input.trim();
 	let match: RegExpMatchArray | null;
+	// Discord did not exist before 2015; this also stops Date.UTC mapping 0-99 to 1900-1999.
+	const validYear = (year: number) => year >= 2015 && year <= 9999;
 	const valid = (y: number, m: number, d: number) => {
+		if (!validYear(y)) return null;
 		const day = civilDayFromDate(y, m, d);
 		const check = civilDate(day);
 		return check.year === y && check.month === m && check.day === d ? day : null;
@@ -211,13 +214,14 @@ export const parseDateInput = (input: string): DateSpan | null => {
 		return day === null ? null : { first: day, last: day };
 	}
 	const month = (y: number, m: number): DateSpan | null => {
-		if (m < 1 || m > 12) return null;
+		if (m < 1 || m > 12 || !validYear(y)) return null;
 		return { first: civilDayFromDate(y, m, 1), last: civilDayFromDate(y, m + 1, 1) - 1 };
 	};
 	if ((match = text.match(/^(\d{4})[-./](\d{1,2})$/))) return month(+match[1], +match[2]);
 	if ((match = text.match(/^(\d{1,2})[-./](\d{4})$/))) return month(+match[2], +match[1]);
 	if ((match = text.match(/^(\d{4})$/))) {
 		const year = +match[1];
+		if (!validYear(year)) return null;
 		return { first: civilDayFromDate(year, 1, 1), last: civilDayFromDate(year, 12, 31) };
 	}
 	return null;
@@ -256,6 +260,9 @@ export interface ResolvedRange {
 
 export class StatsInputError extends Error {}
 
+// User input shown back inside `code`: no backticks, bounded length.
+const quoteInput = (input: string) => input.replace(/`/g, '\'').slice(0, 40);
+
 export const resolveRange = (request: RangeRequest): ResolvedRange => {
 	const { zone, nowMs } = request;
 	const today = civilDayOf(nowMs, zone);
@@ -268,8 +275,8 @@ export const resolveRange = (request: RangeRequest): ResolvedRange => {
 	if (request.from || request.to) {
 		const from = request.from ? parseDateInput(request.from) : null;
 		const to = request.to ? parseDateInput(request.to) : null;
-		if (request.from && !from) throw new StatsInputError('Başlangıç tarihi anlaşılamadı: `' + request.from + '`. Örnek: 2024-03-15, 15.03.2024, 2024-03 veya 2024.');
-		if (request.to && !to) throw new StatsInputError('Bitiş tarihi anlaşılamadı: `' + request.to + '`. Örnek: 2024-03-15, 15.03.2024, 2024-03 veya 2024.');
+		if (request.from && !from) throw new StatsInputError('Başlangıç tarihi anlaşılamadı: `' + quoteInput(request.from) + '`. Örnek: 2024-03-15, 15.03.2024, 2024-03 veya 2024.');
+		if (request.to && !to) throw new StatsInputError('Bitiş tarihi anlaşılamadı: `' + quoteInput(request.to) + '`. Örnek: 2024-03-15, 15.03.2024, 2024-03 veya 2024.');
 		firstDay = from ? from.first : earliest;
 		lastDay = Math.min(to ? to.last : today, today);
 		if (firstDay > today) throw new StatsInputError('Başlangıç tarihi gelecekte olamaz.');
