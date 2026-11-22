@@ -96,8 +96,20 @@ export const BOTS_NOTE = '🤖 Bot mesajları dahil';
 // Charts use plain text: the chart font has no emoji.
 const BOTS_CHART_NOTE = 'Bot mesajları dahil';
 
-// Shown under the first line of the description when bot messages are counted.
-const botsLine = (includeBots: boolean) => includeBots ? '\n' + BOTS_NOTE : '';
+// Bot messages inside the filter: everything minus human messages.
+const botMessageCount = async (filter: StatsFilter) => {
+	const [all, humans] = await Promise.all([
+		countMessages(prismaClient, { ...filter, includeBots: true }),
+		countMessages(prismaClient, { ...filter, includeBots: false }),
+	]);
+	return all - humans;
+};
+
+// Shown under the first line of the description when bot messages are counted,
+// e.g. "🤖 Bot mesajları dahil (**1.234** mesaj)".
+const botsLine = async (filter: StatsFilter) => filter.includeBots
+	? '\n' + BOTS_NOTE + ' (**' + formatNumber(await botMessageCount(filter)) + '** mesaj)'
+	: '';
 const botsChartNotes = (includeBots: boolean) => includeBots ? [BOTS_CHART_NOTE] : [];
 
 const footerText = async () => {
@@ -181,7 +193,7 @@ const serverStats = async (command: ChatInputCommandInteraction, guild: Guild) =
 	const embed = new EmbedBuilder()
 		.setColor(EMBED_COLOR)
 		.setTitle('📊 Mesaj istatistikleri — ' + scope)
-		.setDescription('**' + range.label + '** · ' + intervalNames[series.interval] + ' görünüm' + botsLine(base.includeBots))
+		.setDescription('**' + range.label + '** · ' + intervalNames[series.interval] + ' görünüm' + await botsLine(filter))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Ortalama / ' + unit, value: formatNumber(Math.round(series.total / Math.max(series.starts.length, 1))), inline: true },
@@ -225,7 +237,7 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 		.setColor(EMBED_COLOR)
 		.setTitle('👤 ' + name + ' — mesaj istatistikleri')
 		.setThumbnail(user.displayAvatarURL({ size: 128 }))
-		.setDescription('**' + range.label + '**' + (channel ? ' · <#' + channel.id + '>' : '') + ' · ' + intervalNames[series.interval] + ' görünüm' + botsLine(base.includeBots))
+		.setDescription('**' + range.label + '**' + (channel ? ' · <#' + channel.id + '>' : '') + ' · ' + intervalNames[series.interval] + ' görünüm' + await botsLine(filter))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Sıralama', value: rank.rank ? '#' + rank.rank + ' / ' + formatNumber(authors) : '—', inline: true },
@@ -325,6 +337,7 @@ interface ListPage {
 	title: string;
 	empty: string;
 	header: string;
+	filter: StatsFilter; // the list's filter, used for the bot message note
 	total: number; // number of ranked items
 	lines: (offset: number) => Promise<string[]>;
 	chart: (notes: string[]) => Promise<Buffer>;
@@ -335,13 +348,13 @@ interface ListPage {
 const renderList = async (state: ListState, list: ListPage) => {
 	const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle(list.title);
 	if (!list.total) {
-		embed.setDescription(list.empty + botsLine(state.includeBots)).setFooter({ text: await footerText() });
+		embed.setDescription(list.empty + await botsLine(list.filter)).setFooter({ text: await footerText() });
 		return { embeds: [embed], files: [], components: [] };
 	}
 	const pages = pageCount(list.total);
 	const current = { ...state, page: Math.min(Math.max(state.page, 0), pages - 1) };
 	const lines = await list.lines(current.page * PER_PAGE);
-	embed.setDescription(list.header + botsLine(state.includeBots) + '\n\n' + lines.join('\n'))
+	embed.setDescription(list.header + await botsLine(list.filter) + '\n\n' + lines.join('\n'))
 		.setImage('attachment://stats.png')
 		.setFooter({ text: 'Sayfa ' + (current.page + 1) + '/' + pages + ' · ' + await footerText() });
 	const notes = ['Grafik ilk ' + list.chartCount + ' ' + list.chartUnit + ' gösterir', ...botsChartNotes(state.includeBots)];
@@ -394,6 +407,7 @@ const buildDaysView = async (guild: Guild, state: ListState) => {
 	return renderList(state, {
 		title: '📅 En çok mesaj atılan günler — ' + scope,
 		empty: 'Henüz kayıtlı mesaj yok.',
+		filter,
 		header: ranked.length ? 'Sunucunun başından bu yana · ' + formatDay(Math.min(...days.keys())) + ' itibarıyla ' +
 			plural(ranked.length, 'aktif gün') : '',
 		total: ranked.length,
@@ -427,6 +441,7 @@ const buildUsersView = async (guild: Guild, state: ListState) => {
 	return renderList(state, {
 		title: '🏆 En çok mesaj atanlar — ' + scope,
 		empty: '**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.',
+		filter,
 		header: '**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(authors, 'üye'),
 		total: authors,
 		lines: async offset => {
@@ -465,6 +480,7 @@ const buildChannelsView = async (guild: Guild, state: ListState) => {
 	return renderList(state, {
 		title: '💬 En aktif kanallar — ' + guild.name,
 		empty: '**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.',
+		filter,
 		header: '**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(channels, 'kanal'),
 		total: channels,
 		lines: async offset => {
