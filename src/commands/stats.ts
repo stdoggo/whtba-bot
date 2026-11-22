@@ -408,8 +408,8 @@ const buildDaysView = async (guild: Guild, state: ListState) => {
 		title: '📅 En çok mesaj atılan günler — ' + scope,
 		empty: 'Henüz kayıtlı mesaj yok.',
 		filter,
-		header: ranked.length ? 'Sunucunun başından bu yana · ' + formatDay(Math.min(...days.keys())) + ' itibarıyla ' +
-			plural(ranked.length, 'aktif gün') : '',
+		header: ranked.length ? formatDay(Math.min(...days.keys())) + ' itibarıyla ' +
+			plural(ranked.length, 'gün') : '',
 		total: ranked.length,
 		lines: async offset => ranked.slice(offset, offset + PER_PAGE).map(([day, count], index) =>
 			rankPrefix(offset + index + 1, ranked.length) + ' **' + formatDay(day) + '**, ' + formatWeekday(day) +
