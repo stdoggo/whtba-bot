@@ -6,6 +6,7 @@ import { processInitialReactions } from './utils';
 import { registerMessage } from './queries/register-message';
 import { findMediaLinks } from './media/sites';
 import { handleAutomaticMedia } from './media/automatic';
+import { findMessageLinks } from './media/message-links';
 import { processLoad } from './handlers/load';
 import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
@@ -82,12 +83,15 @@ discordClient.on(Events.MessageCreate, (message: any) => {
 		return;
 	}
 	const links = findMediaLinks(message.content ?? '');
-	if (links.length) {
+	const messageLinks = findMessageLinks(message.content ?? '', allowedGuildId);
+	if (links.length || messageLinks.length) {
 		void handleAutomaticMedia(message, prismaClient, links, async (reply, settings) => {
 			await processInitialReactions(reply, settings);
 			await registerMessage(getMessageParams(reply.channel.id, reply.guild!.id, reply.author.id, reply), prismaClient);
-		}).then(processed => {
-			if (!processed) return processMessage(discordClient, message, prismaClient);
+		}, { messageLinks }).then(processed => {
+			// A converted media link replaces the message's own handling; a message link
+			// preview does not, so reactions and media-only channel rules still apply.
+			if (!processed || !links.length) return processMessage(discordClient, message, prismaClient);
 		}).catch(error => console.error('Media preview handler:', error));
 		return;
 	}

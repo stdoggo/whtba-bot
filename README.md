@@ -43,6 +43,16 @@ Example labels:
 
 Media previews are handled by Discord and external services. Playback availability may vary depending on the provider and Discord's link rendering behavior.
 
+### Discord Message Link Previews
+
+When a member posts a link to a message in this server (`https://discord.com/channels/...`), WHTBA replies with the link and a quote-style preview: author, text, first image, other attachments and the time it was sent.
+
+- Up to three message links per message; `ptb.`, `canary.` and `discordapp.com` links work too.
+- Links wrapped in `<...>` are not previewed, as in Discord.
+- Follows the `/embed preview` settings: the main switch and the allowed channels. It can also be turned off on its own with `/embed preview action:Mesaj linki önizlemesini aç / kapat enabled:false`.
+- Only messages the posting member can read are previewed, so private channels and private threads are never revealed. Messages from NSFW channels are previewed only in NSFW channels.
+- Links to other servers, deleted messages and channels the bot cannot read are ignored.
+
 ### Emoji Reactions
 
 WHTBA can automatically add customizable like and dislike reactions to qualifying messages.
@@ -199,6 +209,7 @@ The `preview` subcommand supports:
 - `channel-add` — add a channel to the preview allowlist.
 - `channel-remove` — remove a channel from the allowlist.
 - `channel-all` — allow previews in every channel.
+- `message-links` — enable or disable Discord message link previews.
 
 **Moderation settings**
 

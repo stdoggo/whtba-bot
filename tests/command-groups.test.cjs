@@ -31,6 +31,8 @@ test('embed settings include preview filters and per-channel media moderation', 
     assert.ok(findSub('embed','preview').options.some(o => o.name === name));
   }
   assert.ok(findSub('embed','moderation').options.some(o => o.name === 'forbid-text'));
+  const actions = findSub('embed','preview').options.find(o => o.name === 'action').choices.map(c => c.value);
+  assert.ok(actions.includes('message-links'));
 });
 
 test('legacy command names are not registered', () => {

@@ -9,11 +9,16 @@ import { getServerSettings } from '../queries/get-server-settings';
 import { getChannelSettings } from '../queries/get-channel-settings';
 import { registerServerSettings, registerChannelSettings } from '../queries/register-settings';
 import { defaultServerSettings, defaultChannelSettings, ServerSettings, ChannelSettings } from '../settings/configure';
-import { mediaHelperSettings } from '../media/settings';
+import { MediaHelperSettings, mediaHelperSettings, messageLinksEnabled } from '../media/settings';
+
+// Message link previews also need the main preview switch.
+const messageLinksStatus = (preferences: MediaHelperSettings) => !messageLinksEnabled(preferences) ? 'Kapalı' :
+	preferences.enabled ? 'Açık' : 'Açık (ama otomatik önizleme kapalı olduğu için çalışmıyor)';
 
 const actions = [
 	{ name: 'Ayarları göster', value: 'show' },
 	{ name: 'Önizlemeyi aç / kapat', value: 'enabled' },
+	{ name: 'Mesaj linki önizlemesini aç / kapat', value: 'message-links' },
 	{ name: 'Kanala izin ver', value: 'channel-add' },
 	{ name: 'Kanalın iznini kaldır', value: 'channel-remove' },
 	{ name: 'Bütün kanallara izin ver', value: 'channel-all' },
@@ -21,11 +26,11 @@ const actions = [
 
 export const embedSettings: Command = {
 	name: 'embed',
-	description: 'Sosyal medya link önizlemelerini ve kanalların medya kurallarını yönet.',
+	description: 'Sosyal medya ve Discord mesaj linki önizlemelerini, kanalların medya kurallarını yönet.',
 	options: [
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'preview',
-			description: 'Otomatik link dönüştürmeyi ve hangi kanallarda çalışacağını yönet.',
+			description: 'Link dönüştürmeyi, mesaj linki önizlemesini ve hangi kanallarda çalışacağını yönet.',
 			options: [
 				{
 					type: ApplicationCommandOptionType.String, name: 'action',
@@ -33,7 +38,7 @@ export const embedSettings: Command = {
 				},
 				{
 					type: ApplicationCommandOptionType.Boolean, name: 'enabled',
-					description: 'Otomatik link dönüştürme açık mı? (İşlem: Önizlemeyi aç / kapat)',
+					description: 'Seçilen işlem açık mı? (Önizlemeyi aç / kapat ya da Mesaj linki önizlemesi)',
 				},
 				{
 					type: ApplicationCommandOptionType.Channel, name: 'channel',
@@ -93,6 +98,13 @@ export const embedSettings: Command = {
 				}
 				preferences.enabled = enabled;
 				changed = true;
+			} else if (action === 'message-links') {
+				if (enabled === null) {
+					await command.editReply('Mesaj linki önizlemesini açmak veya kapatmak için enabled:true/false belirt.');
+					return;
+				}
+				preferences.messageLinks = enabled;
+				changed = true;
 			} else if (action === 'channel-all') {
 				delete preferences.allowedChannelIds;
 				changed = true;
@@ -124,6 +136,7 @@ export const embedSettings: Command = {
 			await command.editReply((changed ? 'Ayarlar kaydedildi.\n\n' : '') +
 				'**Link önizleme ayarları**\n' +
 				'Otomatik dönüştürme: ' + (preferences.enabled ? 'Açık' : 'Kapalı') + '\n' +
+				'Mesaj linki önizlemesi: ' + messageLinksStatus(preferences) + '\n' +
 				'Kanallar: ' + (preferences.allowedChannelIds === undefined ? 'Tüm kanallar' :
 					preferences.allowedChannelIds.length === 0 ? 'Hiçbiri' :
 						preferences.allowedChannelIds.slice(0, 25).map(id => '<#' + id + '>').join(', ')) +
@@ -154,6 +167,7 @@ export const embedSettings: Command = {
 		}
 		await command.editReply('**Link önizleme ve medya ayarları**\n' +
 			'Otomatik link dönüştürme: ' + (preferences.enabled ? 'Açık' : 'Kapalı') + '\n' +
+			'Mesaj linki önizlemesi: ' + messageLinksStatus(preferences) + '\n' +
 			'Önizleme kanalları: ' + (preferences.allowedChannelIds === undefined ? 'Tüm kanallar' :
 				preferences.allowedChannelIds.length === 0 ? 'Hiçbiri' :
 					preferences.allowedChannelIds.slice(0, 25).map(id => '<#' + id + '>').join(', ')) + '\n' +
