@@ -153,15 +153,19 @@ interface Series {
 	days: Map<number, number>; // messages per local day
 }
 
-// "4 Mart 2024 itibarıyla 812 gün": first day with messages and how many days had messages.
-const activeDaysText = (days: Map<number, number>) => {
-	const active = [...days].filter(([, count]) => count > 0).map(([day]) => day);
-	return active.length ? formatDay(Math.min(...active)) + ' itibarıyla ' + plural(active.length, 'gün') : '';
-};
-
 // Shared first line: "**Tüm zamanlar** · 2.110.164 mesaj · <details>".
 const summaryLine = (label: string, total: number, ...details: string[]) =>
 	['**' + label + '**', plural(total, 'mesaj'), ...details.filter(Boolean)].join(' · ');
+
+// First line with the span of days that have messages:
+// "**Tüm zamanlar** (11 Tem 2019 – bugün) · 192.221 mesaj · 2.607 aktif gün · <details>".
+// Custom ranges already show their dates, so only the day count is added there.
+const activeSummaryLine = (label: string, total: number, days: Map<number, number>, custom: boolean, ...details: string[]) => {
+	const active = [...days].filter(([, count]) => count > 0).map(([day]) => day);
+	if (!active.length) return summaryLine(label, total, ...details);
+	const span = custom ? '' : ' (' + bucketLabel(Math.min(...active), 'day', true) + ' – bugün)';
+	return ['**' + label + '**' + span, plural(total, 'mesaj'), plural(active.length, 'aktif gün'), ...details.filter(Boolean)].join(' · ');
+};
 
 const buildSeries = async (range: ResolvedRange, filter: StatsFilter, requested: Interval | null): Promise<Series> => {
 	const zone = statsTimeZone();
@@ -205,7 +209,7 @@ const serverStats = async (command: ChatInputCommandInteraction, guild: Guild) =
 	const embed = new EmbedBuilder()
 		.setColor(EMBED_COLOR)
 		.setTitle('📊 Mesaj istatistikleri — ' + scope)
-		.setDescription(summaryLine(range.label, series.total, activeDaysText(series.days), intervalNames[series.interval] + ' görünüm') +
+		.setDescription(activeSummaryLine(range.label, series.total, series.days, range.custom, intervalNames[series.interval] + ' görünüm') +
 			await botsLine(filter))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
@@ -389,7 +393,7 @@ const rangeFromToken = async (token: string, guild: Guild, base: Partial<StatsFi
 		const firstDay = Number(custom[1]);
 		const lastDay = Number(custom[2]);
 		return {
-			firstDay, lastDay, isAllTime: false,
+			firstDay, lastDay, isAllTime: false, custom: true,
 			label: formatDay(firstDay) + ' – ' + formatDay(lastDay),
 			startMs: civilDayStartMs(firstDay, zone),
 			endMs: Math.min(civilDayStartMs(lastDay + 1, zone), Date.now() + 1),
@@ -421,7 +425,7 @@ const buildDaysView = async (guild: Guild, state: ListState) => {
 		title: '📅 En çok mesaj atılan günler — ' + scope,
 		empty: 'Henüz kayıtlı mesaj yok.',
 		filter,
-		header: summaryLine('Tüm zamanlar', ranked.reduce((sum, [, count]) => sum + count, 0), activeDaysText(days)),
+		header: activeSummaryLine('Tüm zamanlar', ranked.reduce((sum, [, count]) => sum + count, 0), days, false),
 		total: ranked.length,
 		lines: async offset => ranked.slice(offset, offset + PER_PAGE).map(([day, count], index) =>
 			rankPrefix(offset + index + 1, ranked.length) + ' **' + formatDay(day) + '**, ' + formatWeekday(day) +

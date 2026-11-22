@@ -256,6 +256,7 @@ export interface ResolvedRange {
 	endMs: number; // exclusive
 	label: string;
 	isAllTime: boolean;
+	custom: boolean; // from/to dates were given; the label already shows the dates
 }
 
 export class StatsInputError extends Error {}
@@ -301,7 +302,7 @@ export const resolveRange = (request: RangeRequest): ResolvedRange => {
 		isAllTime = preset === 'all';
 	}
 	return {
-		firstDay, lastDay, label, isAllTime,
+		firstDay, lastDay, label, isAllTime, custom: Boolean(request.from || request.to),
 		startMs: civilDayStartMs(firstDay, zone),
 		endMs: Math.min(civilDayStartMs(lastDay + 1, zone), nowMs + 1),
 	};
