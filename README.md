@@ -240,8 +240,8 @@ Message statistics and charts.
 |---|---|
 | `server` | Message chart for the server or one channel |
 | `user` | Message chart, total, rank and share of one member (default: yourself) |
-| `leaderboard` | Who sent how many messages |
-| `channels` | Channels ranked by message count |
+| `leaderboard` | Who sent how many messages, 20 per page with page buttons; the chart shows the top 20 |
+| `channels` | Channels ranked by message count, 20 per page with page buttons; the chart shows the top 20 |
 | `top-days` | All days since the server was created, busiest first, 20 per page (`page` option and ◀ ▶ buttons); the chart shows the top 20 |
 | `sync` | Start, stop or check the history scan (Manage Server) |
 
@@ -251,6 +251,7 @@ Common options:
 - `range` — `Bugün`, `Son 7 gün`, `Son 30 gün`, `Son 90 gün`, `Son 1 yıl`, `Bu hafta`, `Bu ay`, `Bu yıl` or `Tüm zamanlar`.
 - `from` / `to` — custom range. Accepts `2024-03-15`, `15.03.2024`, `2024-03`, `03.2024` or `2024`. `to` is inclusive and defaults to today.
 - `channel` — limit to one channel, including its threads.
+- `page` — page to open (`leaderboard`, `channels`, `top-days`). Use the ◀ ▶ buttons to turn pages; only the member who ran the command can turn them. The first three places get 🥇🥈🥉.
 - `include-bots` — also count bot and webhook messages.
 - `private` — show the result only to you.
 

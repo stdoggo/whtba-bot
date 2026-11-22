@@ -63,19 +63,40 @@ test('stats command is open to members, settings commands stay admin-only', () =
   }
 });
 
-test('top-days pages are encoded in button IDs that survive restarts', () => {
+test('days, leaderboard and channels share the same paginated buttons', () => {
   const stats = require('../src/commands/stats');
-  assert.ok(findSub('stats', 'top-days').options.some(o => o.name === 'page'));
+  for (const sub of ['top-days', 'leaderboard', 'channels']) {
+    assert.ok(findSub('stats', sub).options.some(o => o.name === 'page'), sub);
+    assert.ok(!findSub('stats', sub).options.some(o => o.name === 'limit'), sub);
+  }
   assert.equal(stats.pageCount(0), 1);
   assert.equal(stats.pageCount(20), 1);
   assert.equal(stats.pageCount(21), 2);
-  assert.equal(stats.pageCount(1500), 75);
-  const id = 'whtba:topdays:3:12345678901234567890:0:1:98765432109876543210:next';
-  assert.ok(id.length <= 100);
-  assert.equal(stats.isStatsComponent(id), true);
+  assert.equal(stats.rankPrefix(1, 50), '🥇');
+  assert.equal(stats.rankPrefix(3, 50), '🥉');
+  assert.equal(stats.rankPrefix(4, 50), '` 4.`');
+  assert.equal(stats.rankPrefix(4, 5), '`4.`');
+
+  const snowflake = '12345678901234567890';
+  const states = [
+    { kind: 'days', page: 9999, range: 'all', channelId: snowflake, userId: snowflake, includeBots: true, ownerId: snowflake },
+    { kind: 'users', page: 9999, range: 'd99999-99999', channelId: snowflake, userId: null, includeBots: false, ownerId: snowflake },
+    { kind: 'channels', page: 3, range: 'this-month', channelId: null, userId: null, includeBots: true, ownerId: snowflake },
+  ];
+  for (const state of states) {
+    for (const tag of ['first', 'prev', 'info', 'next', 'last']) {
+      const id = stats.listCustomId(state, state.page, tag);
+      assert.ok(id.length <= 100, id);
+      assert.equal(stats.isStatsComponent(id), true);
+      assert.deepEqual(stats.parseListId(id), state);
+    }
+  }
   assert.equal(stats.isStatsComponent('whtba:reaction-channels:add'), false);
-  assert.deepEqual(stats.parseTopDaysId(id), {
-    page: 3, channelId: '12345678901234567890', userId: null, includeBots: true, ownerId: '98765432109876543210',
+  assert.equal(stats.parseListId('whtba:pg:x:0:0:0:0:1:next'), null);
+  // Buttons on messages posted before this change keep working.
+  const legacy = 'whtba:topdays:3:12345678901234567890:0:1:98765432109876543210:next';
+  assert.equal(stats.isStatsComponent(legacy), true);
+  assert.deepEqual(stats.parseListId(legacy), {
+    kind: 'days', page: 3, range: 'all', channelId: '12345678901234567890', userId: null, includeBots: true, ownerId: '98765432109876543210',
   });
-  assert.equal(stats.parseTopDaysId('whtba:topdays:x:0:0:0:1:next'), null);
 });

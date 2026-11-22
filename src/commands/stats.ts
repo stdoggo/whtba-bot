@@ -7,12 +7,12 @@ import { Command } from '../constants';
 import { messageStats, prismaClient } from '../entry';
 import { formatNumber, renderRanking, renderTimeSeries } from '../stats/chart';
 import {
-	StatsFilter, authorRank, countAuthors, countByHour, countMessages, earliestMessageId,
+	StatsFilter, authorRank, countAuthors, countByHour, countChannels, countMessages, earliestMessageId,
 	getAuthorNames, topAuthors, topChannels,
 } from '../stats/store';
 import {
 	Interval, RangePreset, ResolvedRange, StatsInputError, autoInterval, bucketLabel, bucketStarts,
-	civilDate, civilDayOf, daysToBuckets, formatBucketRange, formatDay, formatWeekday, hoursToDays, intervalNames,
+	civilDate, civilDayOf, civilDayStartMs, daysToBuckets, formatBucketRange, formatDay, formatWeekday, hoursToDays, intervalNames,
 	intervalUnits, msToSnowflake, presetNames, rankDays, resolveRange, snowflakeToMs, statsTimeZone,
 } from '../stats/time';
 
@@ -56,9 +56,8 @@ const botsOption: Option = {
 const privateOption: Option = {
 	type: ApplicationCommandOptionType.Boolean, name: 'private', description: 'Sonucu yalnızca sen gör (gizli yanıt).',
 };
-const limitOption: Option = {
-	type: ApplicationCommandOptionType.Integer, name: 'limit', description: 'Kaç kişi ya da kanal listelensin (varsayılan 20).',
-	minValue: 3, maxValue: 25,
+const pageOption: Option = {
+	type: ApplicationCommandOptionType.Integer, name: 'page', description: 'Açılacak sayfa (varsayılan 1).', minValue: 1,
 };
 
 // ---------------------------------------------------------------------------
@@ -240,112 +239,65 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 	await command.editReply({ embeds: [embed], files: [chartFile(image)] });
 };
 
-const readLimit = (command: ChatInputCommandInteraction) =>
-	Math.min(Math.max(command.options.getInteger('limit') ?? 20, 3), 25);
-
-const leaderboard = async (command: ChatInputCommandInteraction, guild: Guild) => {
-	const channel = command.options.getChannel('channel');
-	const limit = readLimit(command);
-	const base = { channelId: channel?.id, includeBots: command.options.getBoolean('include-bots') ?? false };
-	const range = await readRange(command, guild, base, 'all');
-	const filter = filterFor(range, base);
-	const [top, total, authors, own] = await Promise.all([
-		topAuthors(prismaClient, filter, limit),
-		countMessages(prismaClient, filter),
-		countAuthors(prismaClient, filter),
-		authorRank(prismaClient, filter, command.user.id),
-	]);
-	const scope = channel ? '#' + channel.name : guild.name;
-	const embed = new EmbedBuilder()
-		.setColor(EMBED_COLOR)
-		.setTitle('🏆 En çok mesaj atanlar — ' + scope)
-		.setFooter({ text: await footerText() });
-	if (!top.length) {
-		embed.setDescription('**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.');
-		await command.editReply({ embeds: [embed] });
-		return;
-	}
-	const names = await resolveNames(guild, top.map(item => item.id));
-	const lines = top.map((item, index) => '`' + String(index + 1).padStart(2) + '.` <@' + item.id + '> — **' +
-		formatNumber(item.count) + '** (' + percent(item.count, total) + ')');
-	if (own.rank && !top.some(item => item.id === command.user.id)) lines.push('…\n`' + own.rank + '.` <@' + command.user.id + '> — **' + formatNumber(own.count) + '** (sen)');
-	embed.setDescription('**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(authors, 'üye') + '\n\n' + lines.join('\n'))
-		.setImage('attachment://stats.png');
-	const image = renderRanking({
-		title: 'En çok mesaj atanlar · ' + scope,
-		subtitle: range.label + ' · toplam ' + plural(total, 'mesaj'),
-		labels: top.map(item => names.get(item.id)!),
-		values: top.map(item => item.count),
-	});
-	await command.editReply({ embeds: [embed], files: [chartFile(image)], allowedMentions: { parse: [] } });
-};
-
-const channelRanking = async (command: ChatInputCommandInteraction, guild: Guild) => {
-	const limit = readLimit(command);
-	const base = { includeBots: command.options.getBoolean('include-bots') ?? false };
-	const range = await readRange(command, guild, base, 'all');
-	const filter = filterFor(range, base);
-	const [top, total] = await Promise.all([topChannels(prismaClient, filter, limit), countMessages(prismaClient, filter)]);
-	const embed = new EmbedBuilder()
-		.setColor(EMBED_COLOR)
-		.setTitle('💬 En aktif kanallar — ' + guild.name)
-		.setFooter({ text: await footerText() });
-	if (!top.length) {
-		embed.setDescription('**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.');
-		await command.editReply({ embeds: [embed] });
-		return;
-	}
-	const names = await Promise.all(top.map(item => channelName(guild, item.id)));
-	embed.setDescription('**' + range.label + '** · ' + plural(total, 'mesaj') + '\n\n' + top.map((item, index) =>
-		'`' + String(index + 1).padStart(2) + '.` <#' + item.id + '> — **' + formatNumber(item.count) + '** (' + percent(item.count, total) + ')').join('\n'))
-		.setImage('attachment://stats.png');
-	const image = renderRanking({
-		title: 'En aktif kanallar · ' + guild.name,
-		subtitle: range.label + ' · toplam ' + plural(total, 'mesaj'),
-		labels: names, values: top.map(item => item.count),
-	});
-	await command.editReply({ embeds: [embed], files: [chartFile(image)] });
-};
-
 // ---------------------------------------------------------------------------
-// Busiest days, paginated. The page state lives in the button IDs, so the
-// buttons keep working after a restart and need no stored session.
+// Paginated rankings: busiest days, members and channels share one layout.
+// The page state lives in the button IDs, so the buttons keep working after a
+// restart and need no stored session. Only the member who ran the command can
+// turn the pages.
 // ---------------------------------------------------------------------------
-const TOP_DAYS_PREFIX = 'whtba:topdays:';
-const DAYS_PER_PAGE = 20;
+const PAGE_PREFIX = 'whtba:pg:';
+const LEGACY_TOP_DAYS_PREFIX = 'whtba:topdays:';
+const PER_PAGE = 20;
+const MEDALS = ['🥇', '🥈', '🥉'];
 
-interface TopDaysState {
+export type ListKind = 'days' | 'users' | 'channels';
+const KIND_CODES: Record<ListKind, string> = { days: 'd', users: 'u', channels: 'c' };
+
+export interface ListState {
+	kind: ListKind;
 	page: number; // 0-based
+	// Date range: a preset key, or "d<firstDay>-<lastDay>" for custom dates. Not used for days.
+	range: string;
 	channelId: string | null;
-	userId: string | null;
+	userId: string | null; // days only
 	includeBots: boolean;
 	ownerId: string;
 }
 
-const topDaysId = (state: TopDaysState, page: number, tag: string) =>
-	TOP_DAYS_PREFIX + [page, state.channelId ?? '0', state.userId ?? '0', state.includeBots ? 1 : 0, state.ownerId, tag].join(':');
-
-export const parseTopDaysId = (customId: string): TopDaysState | null => {
-	if (!customId.startsWith(TOP_DAYS_PREFIX)) return null;
-	const [page, channelId, userId, bots, ownerId] = customId.slice(TOP_DAYS_PREFIX.length).split(':');
-	if (!/^\d+$/.test(page ?? '') || !/^\d+$/.test(ownerId ?? '')) return null;
-	return {
-		page: Number(page),
-		channelId: channelId && channelId !== '0' ? channelId : null,
-		userId: userId && userId !== '0' ? userId : null,
-		includeBots: bots === '1',
-		ownerId,
-	};
+// Two filter slots keep the ID under Discord's 100 character limit:
+// days → channel, user; users → range, channel; channels → range.
+export const listCustomId = (state: ListState, page: number, tag: string) => {
+	const slots = state.kind === 'days'
+		? [state.channelId ?? '0', state.userId ?? '0']
+		: [state.range, state.kind === 'users' ? state.channelId ?? '0' : '0'];
+	return PAGE_PREFIX + [KIND_CODES[state.kind], page, ...slots, state.includeBots ? 1 : 0, state.ownerId, tag].join(':');
 };
 
-export const isStatsComponent = (customId: string) => customId.startsWith(TOP_DAYS_PREFIX);
+export const parseListId = (customId: string): ListState | null => {
+	const id = (value: string | undefined) => value && value !== '0' && /^\d+$/.test(value) ? value : null;
+	if (customId.startsWith(LEGACY_TOP_DAYS_PREFIX)) {
+		const [page, channelId, userId, bots, ownerId] = customId.slice(LEGACY_TOP_DAYS_PREFIX.length).split(':');
+		if (!/^\d+$/.test(page ?? '') || !id(ownerId)) return null;
+		return { kind: 'days', page: Number(page), range: 'all', channelId: id(channelId), userId: id(userId), includeBots: bots === '1', ownerId: ownerId! };
+	}
+	if (!customId.startsWith(PAGE_PREFIX)) return null;
+	const [code, page, slotA, slotB, bots, ownerId] = customId.slice(PAGE_PREFIX.length).split(':');
+	const kind = (Object.keys(KIND_CODES) as ListKind[]).find(key => KIND_CODES[key] === code);
+	if (!kind || !/^\d+$/.test(page ?? '') || !id(ownerId) || slotA === undefined || slotB === undefined) return null;
+	const base = { kind, page: Number(page), includeBots: bots === '1', ownerId: ownerId! };
+	if (kind === 'days') return { ...base, range: 'all', channelId: id(slotA), userId: id(slotB) };
+	return { ...base, range: slotA, channelId: kind === 'users' ? id(slotB) : null, userId: null };
+};
 
-export const pageCount = (items: number, perPage = DAYS_PER_PAGE) => Math.max(1, Math.ceil(items / perPage));
+export const isStatsComponent = (customId: string) =>
+	customId.startsWith(PAGE_PREFIX) || customId.startsWith(LEGACY_TOP_DAYS_PREFIX);
 
-const topDaysButtons = (state: TopDaysState, pages: number) => {
+export const pageCount = (items: number, perPage = PER_PAGE) => Math.max(1, Math.ceil(items / perPage));
+
+const pageButtons = (state: ListState, pages: number) => {
 	const page = state.page;
 	const button = (target: number, tag: string, label: string, disabled: boolean) => new ButtonBuilder()
-		.setCustomId(topDaysId(state, target, tag)).setLabel(label).setStyle(ButtonStyle.Secondary).setDisabled(disabled);
+		.setCustomId(listCustomId(state, target, tag)).setLabel(label).setStyle(ButtonStyle.Secondary).setDisabled(disabled);
 	return new ActionRowBuilder<ButtonBuilder>().addComponents(
 		button(0, 'first', '⏮', page === 0),
 		button(Math.max(page - 1, 0), 'prev', '◀ Önceki', page === 0),
@@ -355,7 +307,67 @@ const topDaysButtons = (state: TopDaysState, pages: number) => {
 	);
 };
 
-const buildTopDaysView = async (guild: Guild, state: TopDaysState) => {
+// 🥇🥈🥉 for the first three places, then right-aligned numbers.
+export const rankPrefix = (rank: number, totalItems: number) =>
+	MEDALS[rank - 1] ?? '`' + String(rank).padStart(String(totalItems).length) + '.`';
+
+interface ListPage {
+	title: string;
+	empty: string;
+	header: string;
+	total: number; // number of ranked items
+	lines: (offset: number) => Promise<string[]>;
+	chart: () => Promise<Buffer>;
+	chartCount: number;
+	chartUnit: string;
+}
+
+const renderList = async (state: ListState, list: ListPage) => {
+	const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle(list.title);
+	if (!list.total) {
+		embed.setDescription(list.empty).setFooter({ text: await footerText() });
+		return { embeds: [embed], files: [], components: [] };
+	}
+	const pages = pageCount(list.total);
+	const current = { ...state, page: Math.min(Math.max(state.page, 0), pages - 1) };
+	const lines = await list.lines(current.page * PER_PAGE);
+	embed.setDescription(list.header + '\n\n' + lines.join('\n'))
+		.setImage('attachment://stats.png')
+		.setFooter({ text: 'Sayfa ' + (current.page + 1) + '/' + pages + ' · Grafik ilk ' + list.chartCount + ' ' + list.chartUnit + ' gösterir · ' + await footerText() });
+	return { embeds: [embed], files: [chartFile(await list.chart())], components: pages > 1 ? [pageButtons(current, pages)] : [] };
+};
+
+// Range tokens make a command's date range reproducible from a button ID.
+const rangeToken = (command: ChatInputCommandInteraction, range: ResolvedRange) => {
+	const from = command.options.getString('from');
+	const to = command.options.getString('to');
+	if (from || to) return 'd' + range.firstDay + '-' + range.lastDay;
+	return command.options.getString('range') ?? 'all';
+};
+
+const rangeFromToken = async (token: string, guild: Guild, base: Partial<StatsFilter>): Promise<ResolvedRange> => {
+	const zone = statsTimeZone();
+	const custom = token.match(/^d(\d+)-(\d+)$/);
+	if (custom) {
+		const firstDay = Number(custom[1]);
+		const lastDay = Number(custom[2]);
+		return {
+			firstDay, lastDay, isAllTime: false,
+			label: formatDay(firstDay) + ' – ' + formatDay(lastDay),
+			startMs: civilDayStartMs(firstDay, zone),
+			endMs: Math.min(civilDayStartMs(lastDay + 1, zone), Date.now() + 1),
+		};
+	}
+	const preset = (token in presetNames ? token : 'all') as RangePreset;
+	let earliestMs = guild.createdTimestamp;
+	if (preset === 'all') {
+		const first = await earliestMessageId(prismaClient, base);
+		if (first !== null) earliestMs = snowflakeToMs(first);
+	}
+	return resolveRange({ preset, nowMs: Date.now(), earliestMs, zone });
+};
+
+const buildDaysView = async (guild: Guild, state: ListState) => {
 	const filter: StatsFilter = {
 		startId: 0n, endId: msToSnowflake(Date.now() + 1),
 		channelId: state.channelId, authorId: state.userId, includeBots: state.includeBots,
@@ -367,65 +379,148 @@ const buildTopDaysView = async (guild: Guild, state: TopDaysState) => {
 		state.channelId ? '#' + (channel?.name ?? 'kanal') : guild.name,
 		state.userId ? (await resolveNames(guild, [state.userId])).get(state.userId) : null,
 	].filter(Boolean).join(' · ');
-	const embed = new EmbedBuilder()
-		.setColor(EMBED_COLOR)
-		.setTitle('📅 En çok mesaj atılan günler — ' + scope);
-	if (!ranked.length) {
-		embed.setDescription('Henüz kayıtlı mesaj yok.').setFooter({ text: await footerText() });
-		return { embeds: [embed], files: [], components: [] };
-	}
-	const pages = pageCount(ranked.length);
-	state = { ...state, page: Math.min(Math.max(state.page, 0), pages - 1) };
-	const offset = state.page * DAYS_PER_PAGE;
-	const firstDay = Math.min(...days.keys());
-	const medals = ['🥇', '🥈', '🥉'];
-	const width = String(ranked.length).length;
-	const lines = ranked.slice(offset, offset + DAYS_PER_PAGE).map(([day, count], index) => {
-		const rank = offset + index + 1;
-		return (medals[rank - 1] ?? '`' + String(rank).padStart(width) + '.`') + ' **' + formatDay(day) + '**, ' +
-			formatWeekday(day) + ' — **' + formatNumber(count) + '** mesaj';
-	});
-	embed.setDescription('Sunucunun başından bu yana · ' + formatDay(firstDay) + ' itibarıyla ' +
-		plural(ranked.length, 'aktif gün') + '\n\n' + lines.join('\n'))
-		.setImage('attachment://stats.png')
-		.setFooter({ text: 'Sayfa ' + (state.page + 1) + '/' + pages + ' · Grafik ilk ' + Math.min(TOP_DAYS, ranked.length) + ' günü gösterir · ' + await footerText() });
 	const chartDays = ranked.slice(0, TOP_DAYS);
-	const image = renderRanking({
-		title: 'En yoğun ' + chartDays.length + ' gün · ' + scope,
-		subtitle: 'Tüm zamanlar',
-		labels: chartDays.map(([day]) => bucketLabel(day, 'day', true)),
-		values: chartDays.map(([, count]) => count),
+	return renderList(state, {
+		title: '📅 En çok mesaj atılan günler — ' + scope,
+		empty: 'Henüz kayıtlı mesaj yok.',
+		header: ranked.length ? 'Sunucunun başından bu yana · ' + formatDay(Math.min(...days.keys())) + ' itibarıyla ' +
+			plural(ranked.length, 'aktif gün') : '',
+		total: ranked.length,
+		lines: async offset => ranked.slice(offset, offset + PER_PAGE).map(([day, count], index) =>
+			rankPrefix(offset + index + 1, ranked.length) + ' **' + formatDay(day) + '**, ' + formatWeekday(day) +
+				' — **' + formatNumber(count) + '** mesaj'),
+		chart: async () => renderRanking({
+			title: 'En yoğun ' + chartDays.length + ' gün · ' + scope,
+			subtitle: 'Tüm zamanlar',
+			labels: chartDays.map(([day]) => bucketLabel(day, 'day', true)),
+			values: chartDays.map(([, count]) => count),
+		}),
+		chartCount: chartDays.length,
+		chartUnit: 'günü',
 	});
-	return { embeds: [embed], files: [chartFile(image)], components: pages > 1 ? [topDaysButtons(state, pages)] : [] };
 };
 
-const topDays = async (command: ChatInputCommandInteraction, guild: Guild) => {
-	const user = command.options.getUser('user');
-	const view = await buildTopDaysView(guild, {
-		page: (command.options.getInteger('page') ?? 1) - 1,
-		channelId: command.options.getChannel('channel')?.id ?? null,
-		userId: user?.id ?? null,
-		includeBots: Boolean(user?.bot) || (command.options.getBoolean('include-bots') ?? false),
-		ownerId: command.user.id,
+const buildUsersView = async (guild: Guild, state: ListState) => {
+	const base = { channelId: state.channelId, includeBots: state.includeBots };
+	const range = await rangeFromToken(state.range, guild, base);
+	const filter = filterFor(range, base);
+	const [total, authors, own, top] = await Promise.all([
+		countMessages(prismaClient, filter),
+		countAuthors(prismaClient, filter),
+		authorRank(prismaClient, filter, state.ownerId),
+		topAuthors(prismaClient, filter, TOP_DAYS),
+	]);
+	const channel = state.channelId ? guild.channels.cache.get(state.channelId) : null;
+	const scope = state.channelId ? '#' + (channel?.name ?? 'kanal') : guild.name;
+	return renderList(state, {
+		title: '🏆 En çok mesaj atanlar — ' + scope,
+		empty: '**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.',
+		header: '**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(authors, 'üye'),
+		total: authors,
+		lines: async offset => {
+			const page = offset ? await topAuthors(prismaClient, filter, PER_PAGE, offset) : top.slice(0, PER_PAGE);
+			const lines = page.map((item, index) => rankPrefix(offset + index + 1, authors) + ' <@' + item.id + '> — **' +
+				formatNumber(item.count) + '** mesaj (' + percent(item.count, total) + ')');
+			if (own.rank && !page.some(item => item.id === state.ownerId)) {
+				lines.push('…\n**Sen:** ' + own.rank + '. sıra — <@' + state.ownerId + '> — **' + formatNumber(own.count) + '** mesaj');
+			}
+			return lines;
+		},
+		chart: async () => {
+			const names = await resolveNames(guild, top.map(item => item.id));
+			return renderRanking({
+				title: 'En çok mesaj atanlar · ' + scope,
+				subtitle: range.label + ' · toplam ' + plural(total, 'mesaj'),
+				labels: top.map(item => names.get(item.id)!),
+				values: top.map(item => item.count),
+			});
+		},
+		chartCount: top.length,
+		chartUnit: 'kişiyi',
 	});
+};
+
+const buildChannelsView = async (guild: Guild, state: ListState) => {
+	const base = { includeBots: state.includeBots };
+	const range = await rangeFromToken(state.range, guild, base);
+	const filter = filterFor(range, base);
+	const [total, channels, top] = await Promise.all([
+		countMessages(prismaClient, filter),
+		countChannels(prismaClient, filter),
+		topChannels(prismaClient, filter, TOP_DAYS),
+	]);
+	return renderList(state, {
+		title: '💬 En aktif kanallar — ' + guild.name,
+		empty: '**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.',
+		header: '**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(channels, 'kanal'),
+		total: channels,
+		lines: async offset => {
+			const page = offset ? await topChannels(prismaClient, filter, PER_PAGE, offset) : top.slice(0, PER_PAGE);
+			return page.map((item, index) => rankPrefix(offset + index + 1, channels) + ' <#' + item.id + '> — **' +
+				formatNumber(item.count) + '** mesaj (' + percent(item.count, total) + ')');
+		},
+		chart: async () => renderRanking({
+			title: 'En aktif kanallar · ' + guild.name,
+			subtitle: range.label + ' · toplam ' + plural(total, 'mesaj'),
+			labels: await Promise.all(top.map(item => channelName(guild, item.id))),
+			values: top.map(item => item.count),
+		}),
+		chartCount: top.length,
+		chartUnit: 'kanalı',
+	});
+};
+
+const buildListView = (guild: Guild, state: ListState) => {
+	if (state.kind === 'users') return buildUsersView(guild, state);
+	if (state.kind === 'channels') return buildChannelsView(guild, state);
+	return buildDaysView(guild, state);
+};
+
+const commandListState = async (command: ChatInputCommandInteraction, guild: Guild, kind: ListKind): Promise<ListState> => {
+	const user = kind === 'days' ? command.options.getUser('user') : null;
+	const channelId = kind === 'channels' ? null : command.options.getChannel('channel')?.id ?? null;
+	const includeBots = Boolean(user?.bot) || (command.options.getBoolean('include-bots') ?? false);
+	let range = 'all';
+	if (kind !== 'days') {
+		// Validates from/to and turns them into a token the buttons can carry.
+		range = rangeToken(command, await readRange(command, guild, { channelId, includeBots }, 'all'));
+	}
+	return {
+		kind, range, channelId, includeBots,
+		page: (command.options.getInteger('page') ?? 1) - 1,
+		userId: user?.id ?? null,
+		ownerId: command.user.id,
+	};
+};
+
+const listCommand = (kind: ListKind) => async (command: ChatInputCommandInteraction, guild: Guild) => {
+	const view = await buildListView(guild, await commandListState(command, guild, kind));
 	await command.editReply({ ...view, allowedMentions: { parse: [] } });
 };
+const leaderboard = listCommand('users');
+const channelRanking = listCommand('channels');
+const topDays = listCommand('days');
+
+const listCommandNames: Record<ListKind, string> = { days: 'top-days', users: 'leaderboard', channels: 'channels' };
 
 export const processStatsComponent = async (interaction: ButtonInteraction) => {
-	const state = parseTopDaysId(interaction.customId);
+	const state = parseListId(interaction.customId);
 	if (!state || !interaction.guild) return;
 	if (interaction.user.id !== state.ownerId) {
-		await interaction.reply({ content: 'Bu sayfaları yalnızca komutu kullanan kişi çevirebilir. Kendin için `/stats top-days` kullan.', ephemeral: true });
+		await interaction.reply({
+			content: 'Bu sayfaları yalnızca komutu kullanan kişi çevirebilir. Kendin için `/stats ' + listCommandNames[state.kind] + '` kullan.',
+			ephemeral: true,
+		});
 		return;
 	}
 	await interaction.deferUpdate();
 	try {
 		await messageStats.flush();
-		const view = await buildTopDaysView(interaction.guild, state);
+		const view = await buildListView(interaction.guild, state);
 		await interaction.editReply({ ...view, attachments: [], allowedMentions: { parse: [] } });
 	}
 	catch (error) {
-		console.error('stats top-days page:', error);
+		console.error('stats page:', error);
 		await interaction.followUp({ content: 'Sayfa yüklenemedi. Lütfen tekrar dene.', ephemeral: true });
 	}
 };
@@ -497,20 +592,20 @@ export const stats: Command = {
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'leaderboard',
-			description: 'Kimin toplam kaç mesaj attığını sıralar.',
-			options: [...rangeOptions, channelOption, limitOption, botsOption, privateOption],
+			description: 'Kimin toplam kaç mesaj attığını sıralar, sayfa sayfa.',
+			options: [...rangeOptions, channelOption, pageOption, botsOption, privateOption],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'channels',
-			description: 'Kanalları mesaj sayısına göre sıralar.',
-			options: [...rangeOptions, limitOption, botsOption, privateOption],
+			description: 'Kanalları mesaj sayısına göre sıralar, sayfa sayfa.',
+			options: [...rangeOptions, pageOption, botsOption, privateOption],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'top-days',
 			description: 'Sunucu açıldığından beri en çok mesaj atılan günler, sayfa sayfa.',
 			options: [
 				channelOption,
-				{ type: ApplicationCommandOptionType.Integer, name: 'page', description: 'Açılacak sayfa (varsayılan 1).', minValue: 1 },
+				pageOption,
 				{ type: ApplicationCommandOptionType.User, name: 'user', description: 'Yalnızca bu üyenin mesajları.' },
 				botsOption, privateOption,
 			],

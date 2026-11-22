@@ -66,19 +66,24 @@ export const countAuthors = async (prisma: any, filter: StatsFilter): Promise<nu
 	return Number(rows[0]?.total ?? 0);
 };
 
+export const countChannels = async (prisma: any, filter: StatsFilter): Promise<number> => {
+	const rows: { total: unknown }[] = await prisma.$queryRaw`SELECT COUNT(DISTINCT "channelId") AS "total" FROM "MessageLog" ${where(filter)}`;
+	return Number(rows[0]?.total ?? 0);
+};
+
 export interface Ranked { id: string; count: number; }
 
-export const topAuthors = async (prisma: any, filter: StatsFilter, limit: number): Promise<Ranked[]> => {
+export const topAuthors = async (prisma: any, filter: StatsFilter, limit: number, offset = 0): Promise<Ranked[]> => {
 	const rows: { id: unknown; total: unknown }[] = await prisma.$queryRaw`
 		SELECT "authorId" AS "id", COUNT(*) AS "total" FROM "MessageLog" ${where(filter)}
-		GROUP BY "authorId" ORDER BY "total" DESC, "authorId" ASC LIMIT ${limit}`;
+		GROUP BY "authorId" ORDER BY "total" DESC, "authorId" ASC LIMIT ${limit} OFFSET ${offset}`;
 	return rows.map(row => ({ id: String(row.id), count: Number(row.total) }));
 };
 
-export const topChannels = async (prisma: any, filter: StatsFilter, limit: number): Promise<Ranked[]> => {
+export const topChannels = async (prisma: any, filter: StatsFilter, limit: number, offset = 0): Promise<Ranked[]> => {
 	const rows: { id: unknown; total: unknown }[] = await prisma.$queryRaw`
 		SELECT "channelId" AS "id", COUNT(*) AS "total" FROM "MessageLog" ${where(filter)}
-		GROUP BY "channelId" ORDER BY "total" DESC, "channelId" ASC LIMIT ${limit}`;
+		GROUP BY "channelId" ORDER BY "total" DESC, "channelId" ASC LIMIT ${limit} OFFSET ${offset}`;
 	return rows.map(row => ({ id: String(row.id), count: Number(row.total) }));
 };
 
