@@ -13,12 +13,14 @@
     "updatecommands": "ts-node src/scripts/register-commands.ts",
     "build": "tsc",
     "db:setup": "prisma db push",
-    "db:smoke": "node scripts/sqlite-smoke.cjs"
+    "db:smoke": "node scripts/sqlite-smoke.cjs && node scripts/stats-smoke.cjs"
   },
   "keywords": [],
   "license": "GPL-3.0-only",
   "dependencies": {
+    "@napi-rs/canvas": "0.1.65",
     "@prisma/client": "6.19.0",
+    "chart.js": "4.4.7",
     "cross-env": "^7.0.3",
     "discord.js": "^14.13.0",
     "dotenv": "^16.3.1",

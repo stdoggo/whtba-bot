@@ -89,3 +89,44 @@ model World {
   users     WorldUser[]
   servers   Server[]
 }
+
+// ---------------------------------------------------------------------------
+// Message statistics (/stats)
+// One small row per Discord message. The send time is derived from the
+// snowflake ID, so time-range filters use the primary key directly.
+// ---------------------------------------------------------------------------
+model MessageLog {
+  id        BigInt  @id // Discord message ID (snowflake)
+  channelId BigInt // Top-level channel; thread messages use their parent channel
+  authorId  BigInt
+  isBot     Boolean @default(false)
+
+  @@index([authorId, id])
+  @@index([channelId, id])
+}
+
+// Last known display name of message authors, used for chart labels.
+model MessageAuthor {
+  id        BigInt   @id
+  name      String
+  updatedAt DateTime @updatedAt
+}
+
+// History scan and gap catch-up progress per channel or thread.
+model MessageSyncChannel {
+  id             BigInt   @id // Channel or thread ID
+  parentId       BigInt? // Parent channel for threads
+  name           String?
+  backfillCursor BigInt? // Oldest message ID already scanned
+  backfillDone   Boolean  @default(false)
+  watermark      BigInt? // Everything from the first tracked message up to this ID is stored
+  fetchedCount   Int      @default(0)
+  lastError      String?
+  updatedAt      DateTime @updatedAt
+}
+
+model MessageStatsState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

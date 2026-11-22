@@ -60,6 +60,27 @@ Features include:
 
 Emoji reactions and link previews use independent channel configurations.
 
+### Message Statistics
+
+WHTBA counts the messages sent in every text channel, voice channel text chat, announcement channel, forum post and thread of the server, similar to Statbot.
+
+- Message charts for the whole server, a single channel or a single member.
+- Daily, weekly, monthly or yearly charts, or any custom date range.
+- Leaderboard of who sent how many messages, for any date range.
+- Channel ranking by message count.
+- The 20 busiest days since the server was created.
+- Charts are rendered locally as PNG images; no data is sent to external chart services.
+- Bot and webhook messages are excluded unless `include-bots` is enabled. System messages (joins, pins, boosts) are never counted.
+- Deleted messages are removed from the statistics.
+
+**How counting works**
+
+1. **Live tracking** – every new message is recorded as soon as the bot sees it.
+2. **History scan** – `/stats sync action:Başlat` reads all readable channels and threads back to their first message. On large servers this can take hours. Progress is saved, so the scan resumes automatically after a restart.
+3. **Offline catch-up** – when the bot reconnects, messages sent while it was offline are fetched from each channel.
+
+Only one small row per message is stored: message ID, channel ID, author ID and a bot flag. Message text is not stored. The send time is derived from the Discord message ID. Day boundaries use the `STATS_TIMEZONE` time zone (default `Europe/Istanbul`).
+
 ### Local Database
 
 WHTBA uses SQLite through Prisma.
@@ -68,7 +89,7 @@ All application data is stored locally in a single database file:
 
 `prisma/whtba.db`
 
-This includes server settings, channel configurations, user records, and reaction statistics.
+This includes server settings, channel configurations, user records, reaction statistics and message statistics.
 
 SQLite runs directly within the application. No external database server or database management software is required.
 
@@ -114,6 +135,8 @@ DATABASE_URL="file:./whtba.db"
 | `DISCORD_APPLICATION_ID` | Discord application ID |
 | `DISCORD_GUILD_ID` | ID of the Discord server where the bot operates |
 | `DATABASE_URL` | Local SQLite database connection |
+| `STATS_TIMEZONE` | Optional. Time zone for daily/weekly/monthly/yearly statistics (default `Europe/Istanbul`) |
+| `STATS_FONT_PATH` | Optional. Font file for chart text when the system has no suitable font |
 
 Keep your bot token private. Never commit the `.env` file.
 
@@ -153,9 +176,9 @@ Keep the process running for the bot to remain online.
 
 ## Discord Commands
 
-WHTBA provides two top-level slash commands. Both require the **Manage Server** permission.
+WHTBA provides three top-level slash commands. `/embed-settings` and `/reaction-settings` require the **Manage Server** permission; their responses are visible only to the administrator executing the command.
 
-Configuration responses are visible only to the administrator executing the command.
+`/stats` can be used by every member. Its replies are public unless `private:true` is set. Only `/stats sync` requires **Manage Server**.
 
 ### `/embed-settings`
 
@@ -209,6 +232,38 @@ Administrators can add channels, remove channels, or clear all selected channels
 
 By default, reaction channel filtering is unrestricted until a selection is configured. An explicitly empty selection disables automatic reactions.
 
+### `/stats`
+
+Message statistics and charts.
+
+| Subcommand | Description |
+|---|---|
+| `server` | Message chart for the server or one channel |
+| `user` | Message chart, total, rank and share of one member (default: yourself) |
+| `leaderboard` | Who sent how many messages |
+| `channels` | Channels ranked by message count |
+| `top-days` | The 20 busiest days since the server was created |
+| `sync` | Start, stop or check the history scan (Manage Server) |
+
+Common options:
+
+- `interval` — `Günlük`, `Haftalık`, `Aylık` or `Yıllık` bars (`server`, `user`). Chosen automatically when omitted.
+- `range` — `Bugün`, `Son 7 gün`, `Son 30 gün`, `Son 90 gün`, `Son 1 yıl`, `Bu hafta`, `Bu ay`, `Bu yıl` or `Tüm zamanlar`.
+- `from` / `to` — custom range. Accepts `2024-03-15`, `15.03.2024`, `2024-03`, `03.2024` or `2024`. `to` is inclusive and defaults to today.
+- `channel` — limit to one channel, including its threads.
+- `include-bots` — also count bot and webhook messages.
+- `private` — show the result only to you.
+
+Examples:
+
+- `/stats server interval:Aylık range:Tüm zamanlar`
+- `/stats server from:2024-01-01 to:2024-03-31`
+- `/stats user user:@member interval:Haftalık`
+- `/stats leaderboard range:Bu ay`
+- `/stats top-days`
+
+After the first installation, run `/stats sync action:Başlat` once to count the server's existing message history.
+
 ## Discord Permissions
 
 The bot requires appropriate permissions in the configured server.
@@ -219,10 +274,13 @@ Recommended permissions:
 - Read Message History
 - Send Messages
 - Embed Links
+- Attach Files
 - Add Reactions
 - Manage Messages
 
 The **Manage Messages** permission is used to suppress original link embeds and for configured message moderation.
+
+**Read Message History** is needed in every channel that should be included in the message statistics history scan. **Attach Files** is needed for statistics charts. Private threads are scanned only when the bot can see them or has **Manage Threads**.
 
 Enable the following privileged intent in the Discord Developer Portal:
 

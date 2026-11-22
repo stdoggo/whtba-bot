@@ -9,8 +9,8 @@ const { Commands } = require('../src/constants');
 const groups = Object.fromEntries(Commands.map(command => [command.name, command]));
 const findSub = (group, name) => groups[group].options.find(item => item.name === name);
 
-test('only two top-level slash commands are published', () => {
-  assert.deepEqual(Commands.map(command => command.name).sort(), ['embed-settings','reaction-settings']);
+test('only the three top-level slash commands are published', () => {
+  assert.deepEqual(Commands.map(command => command.name).sort(), ['embed-settings','reaction-settings','stats']);
   assert.equal(Commands.every(command => command.options.every(option =>
     option.type === ApplicationCommandOptionType.Subcommand)), true);
 });
@@ -36,5 +36,29 @@ test('embed settings include preview filters and per-channel media moderation', 
 test('legacy command names are not registered', () => {
   for (const retired of ['help','setupserver','setupchannel','settings','select-channels']) {
     assert.equal(Commands.some(command => command.name === retired), false);
+  }
+});
+
+test('stats command is open to members, settings commands stay admin-only', () => {
+  assert.deepEqual(groups.stats.options.map(option => option.name),
+    ['server','user','leaderboard','channels','top-days','sync']);
+  assert.equal(groups.stats.adminOnly, false);
+  assert.equal(groups['embed-settings'].adminOnly, undefined);
+  assert.equal(groups['reaction-settings'].adminOnly, undefined);
+  for (const sub of ['server','user']) {
+    for (const name of ['interval','range','from','to','channel']) {
+      assert.ok(findSub('stats', sub).options.some(o => o.name === name), sub + ' ' + name);
+    }
+  }
+  const fake = (sub, priv) => ({ options: { getSubcommand: () => sub, getBoolean: () => priv } });
+  assert.equal(groups.stats.ephemeral(fake('server', null)), false);
+  assert.equal(groups.stats.ephemeral(fake('server', true)), true);
+  assert.equal(groups.stats.ephemeral(fake('sync', null)), true);
+  for (const command of Commands) {
+    assert.ok(command.description.length <= 100);
+    for (const sub of command.options) {
+      assert.ok(sub.description.length <= 100, sub.name);
+      for (const option of sub.options ?? []) assert.ok(option.description.length <= 100, sub.name + ' ' + option.name);
+    }
   }
 });

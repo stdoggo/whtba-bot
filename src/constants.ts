@@ -1,4 +1,4 @@
-import { CommandInteraction, ChatInputApplicationCommandData, Client } from 'discord.js';
+import { CommandInteraction, ChatInputApplicationCommandData, ChatInputCommandInteraction, Client } from 'discord.js';
 export const LIKE = '👍';
 export const DISLIKE = '👎';
 export const UNKNOWN = '❓';
@@ -32,10 +32,15 @@ export interface kvp {
 
 export interface Command extends ChatInputApplicationCommandData {
     run: (client: Client, interaction: CommandInteraction) => void;
+    // Defaults to true: only members with Manage Server may use the command.
+    adminOnly?: boolean;
+    // Defaults to true: the reply is visible only to the member who ran the command.
+    ephemeral?: (interaction: ChatInputCommandInteraction) => boolean;
 }
 
 import { embedSettings } from './commands/embed-settings';
 import { reactionSettings } from './commands/reaction-settings';
-export const Commands: Command[] = [embedSettings, reactionSettings];
+import { stats } from './commands/stats';
+export const Commands: Command[] = [embedSettings, reactionSettings, stats];
 
 export const NOT_REGISTERED_MESSAGE = 'Sunucu henüz kayıtlı değil. /reaction-settings server komutunu kullan.';
