@@ -5,7 +5,7 @@ export const processCommand = async (client: Client, interaction: ChatInputComma
 	const command = Commands.find(c => c.name === interaction.commandName);
 	await interaction.deferReply({ ephemeral: command?.ephemeral ? command.ephemeral(interaction) : true });
 	if (!command) {
-		await interaction.editReply('Bu komut artık kullanılmıyor. /embed-settings, /reaction-settings veya /stats kullan.');
+		await interaction.editReply('Bu komut artık kullanılmıyor. /embed, /reaction veya /stats kullan.');
 		return;
 	}
 	if (command.adminOnly !== false && !interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageGuild)) {

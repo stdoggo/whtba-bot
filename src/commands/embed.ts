@@ -12,58 +12,58 @@ import { defaultServerSettings, defaultChannelSettings, ServerSettings, ChannelS
 import { mediaHelperSettings } from '../media/settings';
 
 const actions = [
-	{ name: 'Show settings', value: 'show' },
-	{ name: 'Enable or disable previews', value: 'enabled' },
-	{ name: 'Allow channel', value: 'channel-add' },
-	{ name: 'Remove channel', value: 'channel-remove' },
-	{ name: 'Allow all channels', value: 'channel-all' },
+	{ name: 'Ayarları göster', value: 'show' },
+	{ name: 'Önizlemeyi aç / kapat', value: 'enabled' },
+	{ name: 'Kanala izin ver', value: 'channel-add' },
+	{ name: 'Kanalın iznini kaldır', value: 'channel-remove' },
+	{ name: 'Bütün kanallara izin ver', value: 'channel-all' },
 ];
 
 export const embedSettings: Command = {
-	name: 'embed-settings',
-	description: 'Sosyal medya link önizlemelerini ve kanal medya kurallarını yönet.',
+	name: 'embed',
+	description: 'Sosyal medya link önizlemelerini ve kanalların medya kurallarını yönet.',
 	options: [
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'preview',
-			description: 'Otomatik link dönüştürme ve embed kanal izinlerini yönet.',
+			description: 'Otomatik link dönüştürmeyi ve hangi kanallarda çalışacağını yönet.',
 			options: [
 				{
 					type: ApplicationCommandOptionType.String, name: 'action',
-					description: 'İşlem türü.', choices: actions,
+					description: 'Yapılacak işlem; boşsa ayarlar gösterilir.', choices: actions,
 				},
 				{
 					type: ApplicationCommandOptionType.Boolean, name: 'enabled',
-					description: 'Otomatik embed dönüştürme açık mı?',
+					description: 'Otomatik link dönüştürme açık mı? (İşlem: Önizlemeyi aç / kapat)',
 				},
 				{
 					type: ApplicationCommandOptionType.Channel, name: 'channel',
-					description: 'İzin verilecek veya çıkarılacak kanal.',
+					description: 'İzin verilecek ya da izni kaldırılacak kanal.',
 					channelTypes: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
 				},
 			],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'moderation',
-			description: 'Kanaldaki medyasız mesajların silinip silinmeyeceğini ayarla.',
+			description: 'Bir kanalda medya içermeyen mesajların silinip silinmeyeceğini ayarla.',
 			options: [
 				{
 					type: ApplicationCommandOptionType.Channel, name: 'channel',
-					description: 'Hedef kanal; boşsa mevcut kanal.',
+					description: 'Hedef kanal; boşsa komutu kullandığın kanal.',
 					channelTypes: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
 				},
 				{
 					type: ApplicationCommandOptionType.Integer, name: 'forbid-text',
-					description: 'Medyasız mesajları silme.',
+					description: 'Medya içermeyen mesajlar ne olsun?',
 					choices: [
-						{ name: 'Allow text and media', value: 0 },
-						{ name: 'Require media', value: 1 },
+						{ name: 'Yazıya ve medyaya izin ver', value: 0 },
+						{ name: 'Yalnızca medya (yazı mesajlarını sil)', value: 1 },
 					],
 				},
 			],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'show',
-			description: 'Geçerli link önizleme ve kanal moderasyon ayarlarını göster.',
+			description: 'Link önizleme ve kanal medya ayarlarını göster.',
 		},
 	],
 	run: async (_client: Client, interaction) => {
@@ -122,12 +122,12 @@ export const embedSettings: Command = {
 				}, prismaClient);
 			}
 			await command.editReply((changed ? 'Ayarlar kaydedildi.\n\n' : '') +
-				'**Embed önizleme ayarları**\n' +
+				'**Link önizleme ayarları**\n' +
 				'Otomatik dönüştürme: ' + (preferences.enabled ? 'Açık' : 'Kapalı') + '\n' +
 				'Kanallar: ' + (preferences.allowedChannelIds === undefined ? 'Tüm kanallar' :
 					preferences.allowedChannelIds.length === 0 ? 'Hiçbiri' :
 						preferences.allowedChannelIds.slice(0, 25).map(id => '<#' + id + '>').join(', ')) +
-				'\nEmoji tepkileri /reaction-settings altında yönetilir.');
+				'\nEmoji tepkileri /reaction komutuyla yönetilir.');
 			return;
 		}
 		const target = operation === 'moderation' ? command.options.getChannel('channel') : null;
@@ -152,7 +152,7 @@ export const embedSettings: Command = {
 				'Medyasız mesajlar: ' + (channelSettings.isTextForbidden ? 'Sil' : 'İzin ver'));
 			return;
 		}
-		await command.editReply('**Embed ayarları**\n' +
+		await command.editReply('**Link önizleme ve medya ayarları**\n' +
 			'Otomatik link dönüştürme: ' + (preferences.enabled ? 'Açık' : 'Kapalı') + '\n' +
 			'Önizleme kanalları: ' + (preferences.allowedChannelIds === undefined ? 'Tüm kanallar' :
 				preferences.allowedChannelIds.length === 0 ? 'Hiçbiri' :

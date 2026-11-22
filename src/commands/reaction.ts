@@ -13,40 +13,42 @@ import { getReactionChannelIds } from '../settings/reaction-channels';
 import { showReactionChannelPicker } from './reaction-channels-ui';
 
 const serverEmbedOptions = [
-	{ name: 'Ignore embed reactions', value: 0 },
-	{ name: 'React to every embed', value: 1 },
-	{ name: 'React only to playable videos', value: 2 },
-	{ name: 'React only to image or video previews', value: 3 },
+	{ name: 'Önizlemelere tepki ekleme', value: 0 },
+	{ name: 'Her önizlemeye tepki ekle', value: 1 },
+	{ name: 'Yalnızca oynatılabilir videolara', value: 2 },
+	{ name: 'Yalnızca resim veya video önizlemelerine', value: 3 },
 ];
 const channelEmbedOptions = [
-	{ name: 'Follow server rules', value: 0 },
-	{ name: 'Disallow embed reactions', value: 1 },
-	{ name: 'React to every embed', value: 2 },
-	{ name: 'React only to playable videos', value: 3 },
-	{ name: 'React only to image or video previews', value: 4 },
+	{ name: 'Sunucu ayarını kullan', value: 0 },
+	{ name: 'Bu kanalda önizlemelere tepki ekleme', value: 1 },
+	{ name: 'Her önizlemeye tepki ekle', value: 2 },
+	{ name: 'Yalnızca oynatılabilir videolara', value: 3 },
+	{ name: 'Yalnızca resim veya video önizlemelerine', value: 4 },
 ];
+const ruleName = (options: { name: string; value: number }[], value: number | undefined) =>
+	options.find(option => option.value === (value ?? 0))?.name ?? String(value);
 
 export const reactionSettings: Command = {
-	name: 'reaction-settings',
-	description: 'Emoji, tepki kuralları ve emoji eklenecek kanalları yönet.',
+	name: 'reaction',
+	description: 'Beğeni emojilerini, tepki kurallarını ve emoji eklenecek kanalları yönet.',
 	options: [
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'server',
-			description: 'Sunucu emojilerini ve bot mesajlarına tepki ayarını yönet.',
+			description: 'Sunucunun beğeni emojilerini ve genel tepki kurallarını ayarla.',
 			options: [
 				{ type: ApplicationCommandOptionType.String, name: 'like-reaction', description: 'Beğeni emojisi, örneğin 👍.' },
 				{ type: ApplicationCommandOptionType.String, name: 'dislike-reaction', description: 'Beğenmeme emojisi, örneğin 👎.' },
-				{ type: ApplicationCommandOptionType.Boolean, name: 'react-to-bots', description: 'Diğer botlara ve WHTBA embed yanıtlarına emoji ekle.' },
+				{ type: ApplicationCommandOptionType.Boolean, name: 'react-to-bots', description: 'Diğer botların mesajlarına ve WHTBA link yanıtlarına da emoji eklensin mi?' },
 				{
 					type: ApplicationCommandOptionType.Integer, name: 'allow-embed-reactions',
-					description: 'Bağlantı önizlemelerine hangi koşullarda emoji ekleneceği.',
+					description: 'Link önizlemelerine hangi durumda emoji eklensin?',
 					choices: serverEmbedOptions,
 				},
 			],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'channel',
-			description: 'Belirli bir kanal için embed tepki kurallarını düzenle.',
+			description: 'Bir kanal için önizleme tepki kuralını ayarla.',
 			options: [
 				{
 					type: ApplicationCommandOptionType.Channel, name: 'target',
@@ -55,18 +57,18 @@ export const reactionSettings: Command = {
 				},
 				{
 					type: ApplicationCommandOptionType.Integer, name: 'allow-embed-reactions',
-					description: 'Bu kanalda embed mesajlarına emoji ekleme kuralı.',
+					description: 'Bu kanalda link önizlemelerine hangi durumda emoji eklensin?',
 					choices: channelEmbedOptions,
 				},
 			],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'channels',
-			description: 'Emoji eklenecek kanalları çoklu seçim menüsüyle yönet.',
+			description: 'Emoji eklenecek kanalları seçim menüsüyle belirle.',
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'show',
-			description: 'Sunucunun geçerli emoji ve kanal ayarlarını göster.',
+			description: 'Emoji ve tepki ayarlarını göster.',
 		},
 	],
 	run: async (_client: Client, interaction) => {
@@ -113,7 +115,7 @@ export const reactionSettings: Command = {
 				'Beğeni: ' + settings.likeReaction + '\n' +
 				'Beğenmeme: ' + settings.dislikeReaction + '\n' +
 				'Bot mesajlarına tepki: ' + (settings.reactToBots ? 'Açık' : 'Kapalı') + '\n' +
-				'Embed tepki kuralı: ' + (settings.allowEmbedReactions ?? 0));
+				'Önizleme tepki kuralı: ' + ruleName(serverEmbedOptions, settings.allowEmbedReactions));
 			return;
 		}
 		if (operation === 'channel') {
@@ -135,18 +137,17 @@ export const reactionSettings: Command = {
 			}
 			await command.editReply((value === null ? '' : 'Kanal ayarı kaydedildi.\n\n') +
 				'**<#' + channelId + '> tepki kuralı**\n' +
-				'Embed tepkileri: ' + (channelSettings.allowEmbedReactions ?? 0) +
-				' (0 = sunucu ayarını kullan)');
+				'Önizleme tepki kuralı: ' + ruleName(channelEmbedOptions, channelSettings.allowEmbedReactions));
 			return;
 		}
 		const ids = getReactionChannelIds(settings);
 		await command.editReply('**Emoji ayarları**\n' +
 			'Beğeni: ' + settings.likeReaction + ' | Beğenmeme: ' + settings.dislikeReaction + '\n' +
 			'Bot mesajlarına tepki: ' + (settings.reactToBots ? 'Açık' : 'Kapalı') + '\n' +
-			'Embed tepki kuralı: ' + (settings.allowEmbedReactions ?? 0) + '\n' +
+			'Önizleme tepki kuralı: ' + ruleName(serverEmbedOptions, settings.allowEmbedReactions) + '\n' +
 			'Emoji kanalları: ' + (ids === undefined ? 'Tüm kanallar (varsayılan)' :
 				ids.length === 0 ? 'Hiçbiri' : ids.slice(0, 25).map(id => '<#' + id + '>').join(', ') +
 					(ids.length > 25 ? ' (+' + (ids.length - 25) + ')' : '')) +
-			'\nKanal seçimini değiştirmek için /reaction-settings channels kullan.');
+			'\nKanal seçimini değiştirmek için /reaction channels kullan.');
 	},
 };

@@ -176,11 +176,11 @@ Keep the process running for the bot to remain online.
 
 ## Discord Commands
 
-WHTBA provides three top-level slash commands. `/embed-settings` and `/reaction-settings` require the **Manage Server** permission; their responses are visible only to the administrator executing the command.
+WHTBA provides three top-level slash commands. `/embed` and `/reaction` require the **Manage Server** permission; their responses are visible only to the administrator executing the command.
 
 `/stats` can be used by every member. Its replies are public unless `private:true` is set. Only `/stats sync` requires **Manage Server**.
 
-### `/embed-settings`
+### `/embed`
 
 Controls automatic link previews and channel media rules.
 
@@ -204,7 +204,7 @@ The `preview` subcommand supports:
 
 The `moderation` subcommand controls whether a channel allows ordinary text messages or requires recognized media content.
 
-### `/reaction-settings`
+### `/reaction`
 
 Controls emoji reactions and their channel permissions.
 

@@ -55,7 +55,7 @@ const selectionSummary = (ids: string[] | undefined, notice = ''): string => {
 
 export const showReactionChannelPicker = async (interaction: CommandInteraction): Promise<void> => {
 	if (!interaction.guildId) {
-		await interaction.editReply({ content: 'Bu komut sunucuda kullanılabilir.' });
+		await interaction.editReply({ content: 'Bu komut yalnızca sunucuda kullanılabilir.' });
 		return;
 	}
 	const record = await getServerSettings(interaction.guildId, prismaClient);
@@ -80,7 +80,7 @@ export const processSelectChannelsComponent = async (interaction: ChannelSelectM
 		const serverId = interaction.guildId;
 		const record = await getServerSettings(serverId, prismaClient);
 		if (!record) {
-			await interaction.editReply({ content: 'Önce /reaction-settings server komutunu çalıştır.', components: [] });
+			await interaction.editReply({ content: 'Önce /reaction server komutunu çalıştır.', components: [] });
 			return;
 		}
 		const settings = { ...defaultServerSettings, ...(record.settings as ServerSettings || {}) };

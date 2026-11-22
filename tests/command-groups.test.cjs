@@ -10,31 +10,31 @@ const groups = Object.fromEntries(Commands.map(command => [command.name, command
 const findSub = (group, name) => groups[group].options.find(item => item.name === name);
 
 test('only the three top-level slash commands are published', () => {
-  assert.deepEqual(Commands.map(command => command.name).sort(), ['embed-settings','reaction-settings','stats']);
+  assert.deepEqual(Commands.map(command => command.name).sort(), ['embed','reaction','stats']);
   assert.equal(Commands.every(command => command.options.every(option =>
     option.type === ApplicationCommandOptionType.Subcommand)), true);
 });
 
 test('reaction settings include guild, per-channel embed reactions and multi-channel picker', () => {
-  assert.deepEqual(groups['reaction-settings'].options.map(option => option.name),
+  assert.deepEqual(groups['reaction'].options.map(option => option.name),
     ['server','channel','channels','show']);
   for (const option of ['like-reaction','dislike-reaction','react-to-bots','allow-embed-reactions']) {
-    assert.ok(findSub('reaction-settings','server').options.some(o => o.name === option));
+    assert.ok(findSub('reaction','server').options.some(o => o.name === option));
   }
-  assert.ok(findSub('reaction-settings','channel').options.some(o => o.name === 'allow-embed-reactions'));
+  assert.ok(findSub('reaction','channel').options.some(o => o.name === 'allow-embed-reactions'));
 });
 
 test('embed settings include preview filters and per-channel media moderation', () => {
-  assert.deepEqual(groups['embed-settings'].options.map(option => option.name),
+  assert.deepEqual(groups['embed'].options.map(option => option.name),
     ['preview','moderation','show']);
   for (const name of ['action','enabled','channel']) {
-    assert.ok(findSub('embed-settings','preview').options.some(o => o.name === name));
+    assert.ok(findSub('embed','preview').options.some(o => o.name === name));
   }
-  assert.ok(findSub('embed-settings','moderation').options.some(o => o.name === 'forbid-text'));
+  assert.ok(findSub('embed','moderation').options.some(o => o.name === 'forbid-text'));
 });
 
 test('legacy command names are not registered', () => {
-  for (const retired of ['help','setupserver','setupchannel','settings','select-channels']) {
+  for (const retired of ['help','setupserver','setupchannel','settings','select-channels','embed-settings','reaction-settings']) {
     assert.equal(Commands.some(command => command.name === retired), false);
   }
 });
@@ -43,8 +43,8 @@ test('stats command is open to members, settings commands stay admin-only', () =
   assert.deepEqual(groups.stats.options.map(option => option.name),
     ['server','user','leaderboard','channels','top-days','sync']);
   assert.equal(groups.stats.adminOnly, false);
-  assert.equal(groups['embed-settings'].adminOnly, undefined);
-  assert.equal(groups['reaction-settings'].adminOnly, undefined);
+  assert.equal(groups['embed'].adminOnly, undefined);
+  assert.equal(groups['reaction'].adminOnly, undefined);
   for (const sub of ['server','user']) {
     for (const name of ['interval','range','from','to','channel']) {
       assert.ok(findSub('stats', sub).options.some(o => o.name === name), sub + ' ' + name);

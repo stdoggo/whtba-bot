@@ -38,9 +38,9 @@ export interface Command extends ChatInputApplicationCommandData {
     ephemeral?: (interaction: ChatInputCommandInteraction) => boolean;
 }
 
-import { embedSettings } from './commands/embed-settings';
-import { reactionSettings } from './commands/reaction-settings';
+import { embedSettings } from './commands/embed';
+import { reactionSettings } from './commands/reaction';
 import { stats } from './commands/stats';
 export const Commands: Command[] = [embedSettings, reactionSettings, stats];
 
-export const NOT_REGISTERED_MESSAGE = 'Sunucu henüz kayıtlı değil. /reaction-settings server komutunu kullan.';
+export const NOT_REGISTERED_MESSAGE = 'Sunucu henüz kayıtlı değil. /reaction server komutunu kullan.';

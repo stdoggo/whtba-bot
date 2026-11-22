@@ -32,7 +32,7 @@ const intervalOption: Option = {
 const rangeOptions: Option[] = [
 	{
 		type: ApplicationCommandOptionType.String, name: 'range',
-		description: 'Hazır tarih aralığı. from/to verilirse onlar kullanılır.',
+		description: 'Hazır tarih aralığı. from/to girilirse onlar geçerli olur.',
 		choices: (Object.keys(presetNames) as RangePreset[]).map(value => ({ name: presetNames[value], value })),
 	},
 	{
@@ -46,7 +46,7 @@ const rangeOptions: Option[] = [
 ];
 const channelOption: Option = {
 	type: ApplicationCommandOptionType.Channel, name: 'channel',
-	description: 'Yalnızca bu kanal (alt başlıklar dahil).',
+	description: 'Yalnızca bu kanal (alt başlıkları dahil).',
 	channelTypes: [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice,
 		ChannelType.GuildStageVoice, ChannelType.GuildForum],
 };
@@ -54,10 +54,10 @@ const botsOption: Option = {
 	type: ApplicationCommandOptionType.Boolean, name: 'include-bots', description: 'Bot mesajlarını da say.',
 };
 const privateOption: Option = {
-	type: ApplicationCommandOptionType.Boolean, name: 'private', description: 'Sonucu yalnızca sen gör.',
+	type: ApplicationCommandOptionType.Boolean, name: 'private', description: 'Sonucu yalnızca sen gör (gizli yanıt).',
 };
 const limitOption: Option = {
-	type: ApplicationCommandOptionType.Integer, name: 'limit', description: 'Kaç kişi/kanal listelensin (varsayılan 20).',
+	type: ApplicationCommandOptionType.Integer, name: 'limit', description: 'Kaç kişi ya da kanal listelensin (varsayılan 20).',
 	minValue: 3, maxValue: 25,
 };
 
@@ -481,7 +481,7 @@ export const stats: Command = {
 	options: [
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'server',
-			description: 'Sunucunun (veya bir kanalın) mesaj grafiği.',
+			description: 'Sunucunun ya da bir kanalın mesaj grafiği.',
 			options: [intervalOption, ...rangeOptions, channelOption, botsOption, privateOption],
 		},
 		{
@@ -494,17 +494,17 @@ export const stats: Command = {
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'leaderboard',
-			description: 'Kimin toplam kaç mesaj attığı (sıralama).',
+			description: 'Kimin toplam kaç mesaj attığını sıralar.',
 			options: [...rangeOptions, channelOption, limitOption, botsOption, privateOption],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'channels',
-			description: 'Kanalların mesaj sayısı sıralaması.',
+			description: 'Kanalları mesaj sayısına göre sıralar.',
 			options: [...rangeOptions, limitOption, botsOption, privateOption],
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'top-days',
-			description: 'Sunucu açıldığından beri en çok mesaj atılan günler (sayfa sayfa).',
+			description: 'Sunucu açıldığından beri en çok mesaj atılan günler, sayfa sayfa.',
 			options: [
 				channelOption,
 				{ type: ApplicationCommandOptionType.Integer, name: 'page', description: 'Açılacak sayfa (varsayılan 1).', minValue: 1 },
@@ -514,9 +514,9 @@ export const stats: Command = {
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'sync',
-			description: 'Geçmiş mesaj taramasını yönet (Sunucuyu Yönet yetkisi).',
+			description: 'Geçmiş mesaj taramasını yönet (Sunucuyu Yönet yetkisi gerekir).',
 			options: [{
-				type: ApplicationCommandOptionType.String, name: 'action', description: 'İşlem; boşsa durum gösterilir.',
+				type: ApplicationCommandOptionType.String, name: 'action', description: 'Yapılacak işlem; boşsa durum gösterilir.',
 				choices: [
 					{ name: 'Durum', value: 'status' },
 					{ name: 'Başlat / devam et', value: 'start' },

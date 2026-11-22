@@ -45,7 +45,7 @@ export const isValidEnvironment = async (serverId: string) => {
 		await getServerSettings(serverId, prismaClient),
 	];
 	const results = await Promise.all(all);
-	if (!results[0]) {return { pointOfFailure: 'World environment not setup. This is a global issue.' };}
+	if (!results[0]) {return { pointOfFailure: 'Bot veritabanı henüz hazır değil. Botu yeniden başlat.' };}
 	else if (!results[1]) {return { pointOfFailure: NOT_REGISTERED_MESSAGE };}
 	else if (!results[2]) {return { pointOfFailure: NOT_REGISTERED_MESSAGE };}
 
