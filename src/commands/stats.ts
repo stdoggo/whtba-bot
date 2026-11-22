@@ -158,13 +158,13 @@ const summaryLine = (label: string, total: number, ...details: string[]) =>
 	['**' + label + '**', plural(total, 'mesaj'), ...details.filter(Boolean)].join(' · ');
 
 // First line with the span of days that have messages:
-// "**Tüm zamanlar** (11 Tem 2019 – bugün) · 192.221 mesaj · 2.607 aktif gün · <details>".
+// "**Tüm zamanlar** (11 Tem 2019 – bugün) · 192.221 mesaj · 2.607 gün · <details>".
 // Custom ranges already show their dates, so only the day count is added there.
 const activeSummaryLine = (label: string, total: number, days: Map<number, number>, custom: boolean, ...details: string[]) => {
 	const active = [...days].filter(([, count]) => count > 0).map(([day]) => day);
 	if (!active.length) return summaryLine(label, total, ...details);
 	const span = custom ? '' : ' (' + bucketLabel(Math.min(...active), 'day', true) + ' – bugün)';
-	return ['**' + label + '**' + span, plural(total, 'mesaj'), plural(active.length, 'aktif gün'), ...details.filter(Boolean)].join(' · ');
+	return ['**' + label + '**' + span, plural(total, 'mesaj'), plural(active.length, 'gün'), ...details.filter(Boolean)].join(' · ');
 };
 
 const buildSeries = async (range: ResolvedRange, filter: StatsFilter, requested: Interval | null): Promise<Series> => {
