@@ -150,7 +150,18 @@ interface Series {
 	labels: string[];
 	total: number;
 	peakIndex: number;
+	days: Map<number, number>; // messages per local day
 }
+
+// "4 Mart 2024 itibarıyla 812 gün": first day with messages and how many days had messages.
+const activeDaysText = (days: Map<number, number>) => {
+	const active = [...days].filter(([, count]) => count > 0).map(([day]) => day);
+	return active.length ? formatDay(Math.min(...active)) + ' itibarıyla ' + plural(active.length, 'gün') : '';
+};
+
+// Shared first line: "**Tüm zamanlar** · 2.110.164 mesaj · <details>".
+const summaryLine = (label: string, total: number, ...details: string[]) =>
+	['**' + label + '**', plural(total, 'mesaj'), ...details.filter(Boolean)].join(' · ');
 
 const buildSeries = async (range: ResolvedRange, filter: StatsFilter, requested: Interval | null): Promise<Series> => {
 	const zone = statsTimeZone();
@@ -160,13 +171,14 @@ const buildSeries = async (range: ResolvedRange, filter: StatsFilter, requested:
 		throw new StatsInputError('Bu aralık ' + intervalNames[interval].toLowerCase() + ' gösterim için çok uzun. ' +
 			'Daha kısa bir aralık veya haftalık/aylık/yıllık `interval` seç.');
 	}
-	const buckets = daysToBuckets(hoursToDays(await countByHour(prismaClient, filter), zone), interval);
+	const days = hoursToDays(await countByHour(prismaClient, filter), zone);
+	const buckets = daysToBuckets(days, interval);
 	const values = starts.map(start => buckets.get(start) ?? 0);
 	const withYear = civilDate(range.firstDay).year !== civilDate(range.lastDay).year;
 	const labels = starts.map(start => bucketLabel(start, interval, withYear));
 	let peakIndex = -1;
 	values.forEach((value, index) => { if (value > 0 && (peakIndex < 0 || value > values[peakIndex])) peakIndex = index; });
-	return { interval, starts, values, labels, total: values.reduce((a, b) => a + b, 0), peakIndex };
+	return { interval, starts, values, labels, total: values.reduce((a, b) => a + b, 0), peakIndex, days };
 };
 
 const chartFile = (buffer: Buffer) => new AttachmentBuilder(buffer, { name: 'stats.png' });
@@ -193,7 +205,8 @@ const serverStats = async (command: ChatInputCommandInteraction, guild: Guild) =
 	const embed = new EmbedBuilder()
 		.setColor(EMBED_COLOR)
 		.setTitle('📊 Mesaj istatistikleri — ' + scope)
-		.setDescription('**' + range.label + '** · ' + intervalNames[series.interval] + ' görünüm' + await botsLine(filter))
+		.setDescription(summaryLine(range.label, series.total, activeDaysText(series.days), intervalNames[series.interval] + ' görünüm') +
+			await botsLine(filter))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Ortalama / ' + unit, value: formatNumber(Math.round(series.total / Math.max(series.starts.length, 1))), inline: true },
@@ -237,7 +250,8 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 		.setColor(EMBED_COLOR)
 		.setTitle('👤 ' + name + ' — mesaj istatistikleri')
 		.setThumbnail(user.displayAvatarURL({ size: 128 }))
-		.setDescription('**' + range.label + '**' + (channel ? ' · <#' + channel.id + '>' : '') + ' · ' + intervalNames[series.interval] + ' görünüm' + await botsLine(filter))
+		.setDescription(summaryLine(range.label, series.total, activeDaysText(series.days), channel ? '<#' + channel.id + '>' : '',
+			intervalNames[series.interval] + ' görünüm') + await botsLine(filter))
 		.addFields(
 			{ name: 'Toplam mesaj', value: formatNumber(series.total), inline: true },
 			{ name: 'Sıralama', value: rank.rank ? '#' + rank.rank + ' / ' + formatNumber(authors) : '—', inline: true },
@@ -408,8 +422,7 @@ const buildDaysView = async (guild: Guild, state: ListState) => {
 		title: '📅 En çok mesaj atılan günler — ' + scope,
 		empty: 'Henüz kayıtlı mesaj yok.',
 		filter,
-		header: ranked.length ? formatDay(Math.min(...days.keys())) + ' itibarıyla ' +
-			plural(ranked.length, 'gün') : '',
+		header: summaryLine('Tüm zamanlar', ranked.reduce((sum, [, count]) => sum + count, 0), activeDaysText(days)),
 		total: ranked.length,
 		lines: async offset => ranked.slice(offset, offset + PER_PAGE).map(([day, count], index) =>
 			rankPrefix(offset + index + 1, ranked.length) + ' **' + formatDay(day) + '**, ' + formatWeekday(day) +
@@ -442,7 +455,7 @@ const buildUsersView = async (guild: Guild, state: ListState) => {
 		title: '🏆 En çok mesaj atanlar — ' + scope,
 		empty: '**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.',
 		filter,
-		header: '**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(authors, 'üye'),
+		header: summaryLine(range.label, total, plural(authors, 'üye')),
 		total: authors,
 		lines: async offset => {
 			const page = offset ? await topAuthors(prismaClient, filter, PER_PAGE, offset) : top.slice(0, PER_PAGE);
@@ -481,7 +494,7 @@ const buildChannelsView = async (guild: Guild, state: ListState) => {
 		title: '💬 En aktif kanallar — ' + guild.name,
 		empty: '**' + range.label + '**\nBu aralıkta kayıtlı mesaj yok.',
 		filter,
-		header: '**' + range.label + '** · ' + plural(total, 'mesaj') + ' · ' + plural(channels, 'kanal'),
+		header: summaryLine(range.label, total, plural(channels, 'kanal')),
 		total: channels,
 		lines: async offset => {
 			const page = offset ? await topChannels(prismaClient, filter, PER_PAGE, offset) : top.slice(0, PER_PAGE);
