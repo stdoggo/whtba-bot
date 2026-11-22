@@ -92,10 +92,13 @@ const defaultPresetFor = (interval: Interval | null): RangePreset => {
 	return '30d';
 };
 
-const footerText = async () => {
+export const BOTS_NOTE = '🤖 Bot mesajları dahil';
+
+const footerText = async (includeBots: boolean) => {
 	const zone = statsTimeZone();
-	if (await messageStats.isHistoryComplete()) return 'Saat dilimi: ' + zone;
-	return '⚠️ Geçmiş mesaj taraması tamamlanmadı; eski mesajlar eksik olabilir (/stats sync). Saat dilimi: ' + zone;
+	const notes = includeBots ? BOTS_NOTE + ' · ' : '';
+	if (await messageStats.isHistoryComplete()) return notes + 'Saat dilimi: ' + zone;
+	return notes + '⚠️ Geçmiş mesaj taraması tamamlanmadı; eski mesajlar eksik olabilir (/stats sync). Saat dilimi: ' + zone;
 };
 
 const resolveNames = async (guild: Guild, ids: string[]): Promise<Map<string, string>> => {
@@ -184,7 +187,7 @@ const serverStats = async (command: ChatInputCommandInteraction, guild: Guild) =
 			},
 		)
 		.setImage('attachment://stats.png')
-		.setFooter({ text: await footerText() });
+		.setFooter({ text: await footerText(base.includeBots) });
 	await command.editReply({ embeds: [embed], files: [chartFile(image)] });
 };
 
@@ -229,7 +232,7 @@ const userStats = async (command: ChatInputCommandInteraction, guild: Guild) => 
 			},
 		)
 		.setImage('attachment://stats.png')
-		.setFooter({ text: await footerText() });
+		.setFooter({ text: await footerText(base.includeBots) });
 	if (channels.length) {
 		embed.addFields({
 			name: 'En aktif kanallar',
@@ -325,7 +328,7 @@ interface ListPage {
 const renderList = async (state: ListState, list: ListPage) => {
 	const embed = new EmbedBuilder().setColor(EMBED_COLOR).setTitle(list.title);
 	if (!list.total) {
-		embed.setDescription(list.empty).setFooter({ text: await footerText() });
+		embed.setDescription(list.empty).setFooter({ text: await footerText(state.includeBots) });
 		return { embeds: [embed], files: [], components: [] };
 	}
 	const pages = pageCount(list.total);
@@ -333,7 +336,7 @@ const renderList = async (state: ListState, list: ListPage) => {
 	const lines = await list.lines(current.page * PER_PAGE);
 	embed.setDescription(list.header + '\n\n' + lines.join('\n'))
 		.setImage('attachment://stats.png')
-		.setFooter({ text: 'Sayfa ' + (current.page + 1) + '/' + pages + ' · Grafik ilk ' + list.chartCount + ' ' + list.chartUnit + ' gösterir · ' + await footerText() });
+		.setFooter({ text: 'Sayfa ' + (current.page + 1) + '/' + pages + ' · Grafik ilk ' + list.chartCount + ' ' + list.chartUnit + ' gösterir · ' + await footerText(state.includeBots) });
 	return { embeds: [embed], files: [chartFile(await list.chart())], components: pages > 1 ? [pageButtons(current, pages)] : [] };
 };
 
