@@ -62,3 +62,20 @@ test('stats command is open to members, settings commands stay admin-only', () =
     }
   }
 });
+
+test('top-days pages are encoded in button IDs that survive restarts', () => {
+  const stats = require('../src/commands/stats');
+  assert.ok(findSub('stats', 'top-days').options.some(o => o.name === 'page'));
+  assert.equal(stats.pageCount(0), 1);
+  assert.equal(stats.pageCount(20), 1);
+  assert.equal(stats.pageCount(21), 2);
+  assert.equal(stats.pageCount(1500), 75);
+  const id = 'whtba:topdays:3:12345678901234567890:0:1:98765432109876543210:next';
+  assert.ok(id.length <= 100);
+  assert.equal(stats.isStatsComponent(id), true);
+  assert.equal(stats.isStatsComponent('whtba:reaction-channels:add'), false);
+  assert.deepEqual(stats.parseTopDaysId(id), {
+    page: 3, channelId: '12345678901234567890', userId: null, includeBots: true, ownerId: '98765432109876543210',
+  });
+  assert.equal(stats.parseTopDaysId('whtba:topdays:x:0:0:0:1:next'), null);
+});

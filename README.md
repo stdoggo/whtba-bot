@@ -68,7 +68,7 @@ WHTBA counts the messages sent in every text channel, voice channel text chat, a
 - Daily, weekly, monthly or yearly charts, or any custom date range.
 - Leaderboard of who sent how many messages, for any date range.
 - Channel ranking by message count.
-- The 20 busiest days since the server was created.
+- Every day since the server was created, ranked by message count, with page buttons; the chart shows the top 20.
 - Charts are rendered locally as PNG images; no data is sent to external chart services.
 - Bot and webhook messages are excluded unless `include-bots` is enabled. System messages (joins, pins, boosts) are never counted.
 - Deleted messages are removed from the statistics.
@@ -242,7 +242,7 @@ Message statistics and charts.
 | `user` | Message chart, total, rank and share of one member (default: yourself) |
 | `leaderboard` | Who sent how many messages |
 | `channels` | Channels ranked by message count |
-| `top-days` | The 20 busiest days since the server was created |
+| `top-days` | All days since the server was created, busiest first, 20 per page (`page` option and ◀ ▶ buttons); the chart shows the top 20 |
 | `sync` | Start, stop or check the history scan (Manage Server) |
 
 Common options:

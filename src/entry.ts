@@ -11,6 +11,7 @@ import { processCommand } from './handlers/command';
 import { processReaction } from './handlers/reactions';
 import { isSelectChannelsComponent, processSelectChannelsComponent } from './commands/reaction-channels-ui';
 import { PrismaClient } from '@prisma/client';
+import { isStatsComponent, processStatsComponent } from './commands/stats';
 import { MessageStatsService } from './stats/service';
 
 // Local SQLite database. Prisma reads DATABASE_URL from .env.
@@ -110,6 +111,9 @@ discordClient.on(Events.InteractionCreate, async interaction => {
 	else if ((interaction.isChannelSelectMenu() || interaction.isButton()) &&
 		isSelectChannelsComponent(interaction.customId)) {
 		await processSelectChannelsComponent(interaction);
+	}
+	else if (interaction.isButton() && isStatsComponent(interaction.customId)) {
+		await processStatsComponent(interaction);
 	}
 });
 

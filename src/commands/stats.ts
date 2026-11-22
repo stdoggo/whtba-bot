@@ -1,4 +1,5 @@
 import {
+	ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle,
 	ApplicationCommandOptionData, ApplicationCommandOptionType, ApplicationCommandSubCommandData, ApplicationCommandSubGroupData, AttachmentBuilder, ChannelType,
 	ChatInputCommandInteraction, Client, EmbedBuilder, Guild, PermissionsBitField,
 } from 'discord.js';
@@ -303,41 +304,127 @@ const channelRanking = async (command: ChatInputCommandInteraction, guild: Guild
 	await command.editReply({ embeds: [embed], files: [chartFile(image)] });
 };
 
-const topDays = async (command: ChatInputCommandInteraction, guild: Guild) => {
-	const channel = command.options.getChannel('channel');
-	const user = command.options.getUser('user');
+// ---------------------------------------------------------------------------
+// Busiest days, paginated. The page state lives in the button IDs, so the
+// buttons keep working after a restart and need no stored session.
+// ---------------------------------------------------------------------------
+const TOP_DAYS_PREFIX = 'whtba:topdays:';
+const DAYS_PER_PAGE = 20;
+
+interface TopDaysState {
+	page: number; // 0-based
+	channelId: string | null;
+	userId: string | null;
+	includeBots: boolean;
+	ownerId: string;
+}
+
+const topDaysId = (state: TopDaysState, page: number, tag: string) =>
+	TOP_DAYS_PREFIX + [page, state.channelId ?? '0', state.userId ?? '0', state.includeBots ? 1 : 0, state.ownerId, tag].join(':');
+
+export const parseTopDaysId = (customId: string): TopDaysState | null => {
+	if (!customId.startsWith(TOP_DAYS_PREFIX)) return null;
+	const [page, channelId, userId, bots, ownerId] = customId.slice(TOP_DAYS_PREFIX.length).split(':');
+	if (!/^\d+$/.test(page ?? '') || !/^\d+$/.test(ownerId ?? '')) return null;
+	return {
+		page: Number(page),
+		channelId: channelId && channelId !== '0' ? channelId : null,
+		userId: userId && userId !== '0' ? userId : null,
+		includeBots: bots === '1',
+		ownerId,
+	};
+};
+
+export const isStatsComponent = (customId: string) => customId.startsWith(TOP_DAYS_PREFIX);
+
+export const pageCount = (items: number, perPage = DAYS_PER_PAGE) => Math.max(1, Math.ceil(items / perPage));
+
+const topDaysButtons = (state: TopDaysState, pages: number) => {
+	const page = state.page;
+	const button = (target: number, tag: string, label: string, disabled: boolean) => new ButtonBuilder()
+		.setCustomId(topDaysId(state, target, tag)).setLabel(label).setStyle(ButtonStyle.Secondary).setDisabled(disabled);
+	return new ActionRowBuilder<ButtonBuilder>().addComponents(
+		button(0, 'first', '⏮', page === 0),
+		button(Math.max(page - 1, 0), 'prev', '◀ Önceki', page === 0),
+		button(page, 'info', 'Sayfa ' + (page + 1) + ' / ' + pages, true),
+		button(Math.min(page + 1, pages - 1), 'next', 'Sonraki ▶', page >= pages - 1),
+		button(pages - 1, 'last', '⏭', page >= pages - 1),
+	);
+};
+
+const buildTopDaysView = async (guild: Guild, state: TopDaysState) => {
 	const filter: StatsFilter = {
 		startId: 0n, endId: msToSnowflake(Date.now() + 1),
-		channelId: channel?.id, authorId: user?.id,
-		includeBots: Boolean(user?.bot) || (command.options.getBoolean('include-bots') ?? false),
+		channelId: state.channelId, authorId: state.userId, includeBots: state.includeBots,
 	};
 	const days = hoursToDays(await countByHour(prismaClient, filter), statsTimeZone());
-	const ranked = rankDays(days, TOP_DAYS);
-	const scope = [channel ? '#' + channel.name : guild.name, user ? (await resolveNames(guild, [user.id])).get(user.id) : null]
-		.filter(Boolean).join(' · ');
+	const ranked = rankDays(days, Infinity);
+	const channel = state.channelId ? guild.channels.cache.get(state.channelId) : null;
+	const scope = [
+		state.channelId ? '#' + (channel?.name ?? 'kanal') : guild.name,
+		state.userId ? (await resolveNames(guild, [state.userId])).get(state.userId) : null,
+	].filter(Boolean).join(' · ');
 	const embed = new EmbedBuilder()
 		.setColor(EMBED_COLOR)
-		.setTitle('📅 En çok mesaj atılan ' + TOP_DAYS + ' gün — ' + scope)
-		.setFooter({ text: await footerText() });
+		.setTitle('📅 En çok mesaj atılan günler — ' + scope);
 	if (!ranked.length) {
-		embed.setDescription('Henüz kayıtlı mesaj yok.');
-		await command.editReply({ embeds: [embed] });
-		return;
+		embed.setDescription('Henüz kayıtlı mesaj yok.').setFooter({ text: await footerText() });
+		return { embeds: [embed], files: [], components: [] };
 	}
+	const pages = pageCount(ranked.length);
+	state = { ...state, page: Math.min(Math.max(state.page, 0), pages - 1) };
+	const offset = state.page * DAYS_PER_PAGE;
 	const firstDay = Math.min(...days.keys());
 	const medals = ['🥇', '🥈', '🥉'];
-	embed.setDescription('Sunucunun başından bu yana (' + formatDay(firstDay) + ' itibarıyla kayıtlı ' +
-		plural(days.size, 'aktif gün') + ').\n\n' + ranked.map(([day, count], index) =>
-		(medals[index] ?? '`' + String(index + 1).padStart(2) + '.`') + ' **' + formatDay(day) + '**, ' +
-			formatWeekday(day) + ' — **' + formatNumber(count) + '** mesaj').join('\n'))
-		.setImage('attachment://stats.png');
-	const image = renderRanking({
-		title: 'En yoğun ' + TOP_DAYS + ' gün · ' + scope,
-		subtitle: 'Tüm zamanlar',
-		labels: ranked.map(([day]) => bucketLabel(day, 'day', true)),
-		values: ranked.map(([, count]) => count),
+	const width = String(ranked.length).length;
+	const lines = ranked.slice(offset, offset + DAYS_PER_PAGE).map(([day, count], index) => {
+		const rank = offset + index + 1;
+		return (medals[rank - 1] ?? '`' + String(rank).padStart(width) + '.`') + ' **' + formatDay(day) + '**, ' +
+			formatWeekday(day) + ' — **' + formatNumber(count) + '** mesaj';
 	});
-	await command.editReply({ embeds: [embed], files: [chartFile(image)], allowedMentions: { parse: [] } });
+	embed.setDescription('Sunucunun başından bu yana · ' + formatDay(firstDay) + ' itibarıyla ' +
+		plural(ranked.length, 'aktif gün') + '\n\n' + lines.join('\n'))
+		.setImage('attachment://stats.png')
+		.setFooter({ text: 'Sayfa ' + (state.page + 1) + '/' + pages + ' · Grafik ilk ' + Math.min(TOP_DAYS, ranked.length) + ' günü gösterir · ' + await footerText() });
+	const chartDays = ranked.slice(0, TOP_DAYS);
+	const image = renderRanking({
+		title: 'En yoğun ' + chartDays.length + ' gün · ' + scope,
+		subtitle: 'Tüm zamanlar',
+		labels: chartDays.map(([day]) => bucketLabel(day, 'day', true)),
+		values: chartDays.map(([, count]) => count),
+	});
+	return { embeds: [embed], files: [chartFile(image)], components: pages > 1 ? [topDaysButtons(state, pages)] : [] };
+};
+
+const topDays = async (command: ChatInputCommandInteraction, guild: Guild) => {
+	const user = command.options.getUser('user');
+	const view = await buildTopDaysView(guild, {
+		page: (command.options.getInteger('page') ?? 1) - 1,
+		channelId: command.options.getChannel('channel')?.id ?? null,
+		userId: user?.id ?? null,
+		includeBots: Boolean(user?.bot) || (command.options.getBoolean('include-bots') ?? false),
+		ownerId: command.user.id,
+	});
+	await command.editReply({ ...view, allowedMentions: { parse: [] } });
+};
+
+export const processStatsComponent = async (interaction: ButtonInteraction) => {
+	const state = parseTopDaysId(interaction.customId);
+	if (!state || !interaction.guild) return;
+	if (interaction.user.id !== state.ownerId) {
+		await interaction.reply({ content: 'Bu sayfaları yalnızca komutu kullanan kişi çevirebilir. Kendin için `/stats top-days` kullan.', ephemeral: true });
+		return;
+	}
+	await interaction.deferUpdate();
+	try {
+		await messageStats.flush();
+		const view = await buildTopDaysView(interaction.guild, state);
+		await interaction.editReply({ ...view, attachments: [], allowedMentions: { parse: [] } });
+	}
+	catch (error) {
+		console.error('stats top-days page:', error);
+		await interaction.followUp({ content: 'Sayfa yüklenemedi. Lütfen tekrar dene.', ephemeral: true });
+	}
 };
 
 const statusNames: Record<string, string> = {
@@ -417,9 +504,10 @@ export const stats: Command = {
 		},
 		{
 			type: ApplicationCommandOptionType.Subcommand, name: 'top-days',
-			description: 'Sunucu açıldığından beri en çok mesaj atılan 20 gün.',
+			description: 'Sunucu açıldığından beri en çok mesaj atılan günler (sayfa sayfa).',
 			options: [
 				channelOption,
+				{ type: ApplicationCommandOptionType.Integer, name: 'page', description: 'Açılacak sayfa (varsayılan 1).', minValue: 1 },
 				{ type: ApplicationCommandOptionType.User, name: 'user', description: 'Yalnızca bu üyenin mesajları.' },
 				botsOption, privateOption,
 			],
