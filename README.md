@@ -27,6 +27,7 @@ Supported platforms:
 **Embed behavior:**
 
 - Automatically detects up to three supported links per message.
+- Removes tracking and share parameters (`?s=20`, `?igsh=…`, `#…`) from the converted link; only parameters needed to open the video are kept.
 - Generates compact labels using the platform name and post identifier.
 - Uses inline-code styling for link labels.
 - Attempts to suppress the original Discord embed.

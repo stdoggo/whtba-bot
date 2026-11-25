@@ -8,6 +8,13 @@ export interface MediaLink {
 }
 const URL_PATTERN = /https?:\/\/[^\s<>]+/gi;
 
+// Query parameters a platform needs to open the right video; everything else is removed.
+const KEEP_PARAMS: Partial<Record<SupportedSite, string[]>> = {
+	youtube: ['v'], // set from the Shorts ID
+	facebook: ['v'], // facebook.com/watch?v=<id>
+	vimeo: ['h'], // private-link hash of unlisted videos
+};
+
 export const mediaLinkFromUrl = (raw: string): MediaLink | null => {
 	let url: URL;
 	try { url = new URL(raw); } catch { return null; }
@@ -53,6 +60,15 @@ export const mediaLinkFromUrl = (raw: string): MediaLink | null => {
 	} else if (['dailymotion.com','www.dailymotion.com','dai.ly'].includes(host)) {
 		platform = 'dailymotion';
 	} else return null;
+	// Drop tracking and share parameters (?s=20, ?igsh=..., ?_t=...) and #fragments.
+	// Only parameters that select the video itself are kept.
+	const kept = new URLSearchParams();
+	for (const key of KEEP_PARAMS[platform] ?? []) {
+		const value = url.searchParams.get(key);
+		if (value) kept.set(key, value);
+	}
+	url.search = kept.toString();
+	url.hash = '';
 	url.protocol = 'https:';
 	if (destination) url.hostname = destination;
 	url.port = '';

@@ -187,3 +187,23 @@ test('Reddit short share links use the share code in the clickable label', () =>
   assert.equal(proxyEmbedLine(link),
     '[`reddit-JzzRODtyrd`](https://vxreddit.com/r/GamingLeaksAndRumours/s/JzzRODtyrd)');
 });
+
+test('converted links drop tracking parameters and fragments', () => {
+  const clean = [
+    ['https://x.com/llatayrcton/status/2125021501695070326?a=eGxBS3YcKxMKJU2JEqk&s=20', 'https://fxtwitter.com/llatayrcton/status/2125021501695070326'],
+    ['https://www.tiktok.com/@user/video/123?_r=1&_t=ZS-8abc', 'https://tnktok.com/@user/video/123'],
+    ['https://www.instagram.com/reel/ABC123/?igsh=MWQ1ZGUxMzBkMA==', 'https://eeinstagram.com/reel/ABC123/'],
+    ['https://www.reddit.com/r/a/comments/b/c/?share_id=xyz&utm_source=share#top', 'https://vxreddit.com/r/a/comments/b/c/'],
+    ['https://youtube.com/shorts/AbCdEfGh123?si=trackme', 'https://www.youtube.com/watch?v=AbCdEfGh123'],
+    ['https://www.facebook.com/watch?v=12345&ref=sharing', 'https://facebed.seria.moe/watch?v=12345'],
+    ['https://vimeo.com/123456/abcdef?h=abcdef12&share=copy', 'https://vimeo.com/123456/abcdef?h=abcdef12'],
+    ['https://streamable.com/ab123?src=player', 'https://streamable.com/ab123'],
+  ];
+  for (const [url, expected] of clean) {
+    const link = mediaLinkFromUrl(url);
+    assert.equal(link?.fixed, expected, url);
+    assert.equal(link?.original, url, 'the original link is kept for the label');
+  }
+  assert.equal(proxyEmbedLine(mediaLinkFromUrl(clean[0][0])),
+    '[`twitter-2125021501695070326`](https://fxtwitter.com/llatayrcton/status/2125021501695070326)');
+});
